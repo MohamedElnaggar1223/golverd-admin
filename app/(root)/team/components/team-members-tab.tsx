@@ -49,7 +49,7 @@ export function TeamMembersTab() {
             const matchesPosition = positionFilter === 'all' ||
                 member.positionId === positionFilter;
 
-            return matchesSearch && matchesPosition;
+            return matchesSearch && matchesPosition && !member.isBusinessOwner;
         });
     }, [allTeamMembers, debouncedSearch, positionFilter]);
 

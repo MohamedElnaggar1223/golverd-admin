@@ -14,7 +14,7 @@ export default async function SignInPage() {
 
     // If user is already authenticated, redirect to dashboard
     if (user) {
-        redirect("/dashboard");
+        redirect("/");
     }
 
     return (
