@@ -48,7 +48,8 @@ export function NewTeamMemberTab() {
                 description: "The team member has been created successfully.",
                 descriptionClassName: "description-class",
                 classNames: {
-                    title: "title-class"
+                    title: "title-class",
+                    description: "description-class"
                 }
             });
             form.reset();
@@ -59,7 +60,8 @@ export function NewTeamMemberTab() {
                 description: error.message || "Failed to create team member",
                 descriptionClassName: "description-class",
                 classNames: {
-                    title: "title-class"
+                    title: "title-class",
+                    description: "description-class"
                 }
             });
         }
@@ -118,7 +120,8 @@ export function NewTeamMemberTab() {
                 description: "Profile picture uploaded successfully",
                 descriptionClassName: "description-class",
                 classNames: {
-                    title: "title-class"
+                    title: "title-class",
+                    description: "description-class"
                 }
             });
         } catch (error: any) {
@@ -126,7 +129,8 @@ export function NewTeamMemberTab() {
                 description: error.message || "Failed to upload image",
                 descriptionClassName: "description-class",
                 classNames: {
-                    title: "title-class"
+                    title: "title-class",
+                    description: "description-class"
                 }
             });
         } finally {

@@ -97,6 +97,11 @@ export function TeamMemberEdit({ id }: { id: string }) {
             toast("Team member updated", {
                 description: "The team member has been updated successfully.",
                 icon: <CheckCircle className="h-5 w-5 text-green-500" />,
+                descriptionClassName: "description-class",
+                classNames: {
+                    title: "title-class",
+                    description: "description-class"
+                }
             });
             router.push('/team');
         },
@@ -104,16 +109,30 @@ export function TeamMemberEdit({ id }: { id: string }) {
             toast("Error", {
                 description: error.message || "Failed to update team member",
                 icon: <AlertTriangle className="h-5 w-5 text-red-500" />,
+                descriptionClassName: "description-class",
+                classNames: {
+                    title: "title-class",
+                    description: "description-class"
+                }
             });
         }
     });
 
     const deleteTeamMemberMutation = useMutation({
         mutationFn: () => deleteTeamMember(id),
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['team-members'] });
+            queryClient.invalidateQueries({ queryKey: ['team-member', id] });
+        },
         onSuccess: () => {
             toast("Team member deleted", {
                 description: "The team member has been deleted successfully.",
                 icon: <CheckCircle className="h-5 w-5 text-green-500" />,
+                descriptionClassName: "description-class",
+                classNames: {
+                    title: "title-class",
+                    description: "description-class"
+                }
             });
             router.push('/team');
         },
@@ -121,6 +140,11 @@ export function TeamMemberEdit({ id }: { id: string }) {
             toast("Error", {
                 description: error.message || "Failed to delete team member",
                 icon: <AlertTriangle className="h-5 w-5 text-red-500" />,
+                descriptionClassName: "description-class",
+                classNames: {
+                    title: "title-class",
+                    description: "description-class"
+                }
             });
         }
     });
@@ -222,11 +246,21 @@ export function TeamMemberEdit({ id }: { id: string }) {
 
             toast("Image uploaded", {
                 description: "Profile picture uploaded successfully",
+                descriptionClassName: "description-class",
+                classNames: {
+                    title: "title-class",
+                    description: "description-class"
+                },
                 icon: <CheckCircle className="h-5 w-5 text-green-500" />,
             });
         } catch (error: any) {
             toast("Upload failed", {
                 description: error.message || "Failed to upload image",
+                descriptionClassName: "description-class",
+                classNames: {
+                    title: "title-class",
+                    description: "description-class"
+                },
                 icon: <AlertTriangle className="h-5 w-5 text-red-500" />,
             });
         } finally {

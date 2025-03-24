@@ -86,7 +86,8 @@ export function PositionsTab() {
                 description: error.message || "Failed to delete position",
                 descriptionClassName: "description-class",
                 classNames: {
-                    title: "title-class"
+                    title: "title-class",
+                    description: "description-class"
                 }
             });
         }
