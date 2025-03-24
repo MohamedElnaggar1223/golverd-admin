@@ -139,8 +139,11 @@ export async function deletePosition(id: string) {
         }
 
         // Check if any team members use this position
-        const teamMembersWithPosition = await SuperUser.countDocuments({ positionId: id });
-        if (teamMembersWithPosition > 0) {
+        const teamMembersWithPosition = await SuperUser.find({ positionId: id });
+
+        console.log("TEAM MEMBERS WITH POSITION: ", teamMembersWithPosition)
+
+        if (teamMembersWithPosition.length > 0) {
             throw new Error('Cannot delete position that is assigned to team members');
         }
 
@@ -437,8 +440,10 @@ export async function deleteTeamMember(id: string) {
         }
 
         // Soft delete by setting isActive to false
-        teamMember.isActive = false;
-        await teamMember.save();
+        // teamMember.isActive = false;
+        // await teamMember.save();
+
+        await SuperUser.findByIdAndDelete(id);
 
         return { success: true };
     } catch (error) {
