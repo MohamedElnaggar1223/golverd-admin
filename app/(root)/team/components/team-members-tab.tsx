@@ -55,18 +55,19 @@ export function TeamMembersTab() {
 
     return (
         <div className="space-y-6">
+            <h1 className="text-lg font-bold mb-6">Team Members</h1>
             <div className="flex flex-col sm:flex-row gap-4">
-                <div className="relative flex-1">
+                <div className="relative flex-1 max-w-[560px] bg-white rounded-sm border-none">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
                     <Input
                         placeholder="Search team members..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-8 w-full"
+                        className="pl-8 w-full rounded-sm"
                     />
                 </div>
                 <Select value={positionFilter} onValueChange={setPositionFilter}>
-                    <SelectTrigger className="w-full sm:w-[200px]">
+                    <SelectTrigger className="w-full sm:w-[200px] rounded-sm bg-white">
                         <SelectValue placeholder="Filter by position" />
                     </SelectTrigger>
                     <SelectContent>
@@ -82,19 +83,27 @@ export function TeamMembersTab() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredTeamMembers.map((member: any) => (
-                    <Card key={member._id} className="overflow-hidden">
-                        <CardHeader className="pb-0">
+                    <Card key={member._id} className="overflow-hidden rounded-[4px] w-fit min-w-[370px] py-4">
+                        <CardHeader className="pb-0 border-b border-gray-200 shadow-[0px_1px_0px_0px_rgba(0,0,0,0.1)]">
+                            <div className='w-full flex items-center justify-end space-x-1'>
+                                <p className="text-sm font-medium">Joined</p>
+                                <p className="text-sm text-gray-500">
+                                    {member.createdAt
+                                        ? formatDistanceToNow(new Date(member.createdAt), { addSuffix: true })
+                                        : 'Unknown'}
+                                </p>
+                            </div>
                             <div className="flex justify-between items-start">
                                 <div className="flex items-center gap-4">
-                                    <Avatar className="h-12 w-12">
+                                    <Avatar className="h-16 w-16">
                                         <AvatarImage src={member.profilePicture || ''} alt={member.name} />
-                                        <AvatarFallback>
+                                        <AvatarFallback className='bg-[#E8E4E1]'>
                                             {member.name.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
                                         </AvatarFallback>
                                     </Avatar>
                                     <div>
                                         <h3 className="font-medium">{member.name}</h3>
-                                        <p className="text-sm text-gray-500">{member.email}</p>
+                                        <p className="text-sm text-gray-500">{member.position?.name || 'No Position'}</p>
                                     </div>
                                 </div>
                                 {member.isBusinessOwner && (
@@ -102,29 +111,19 @@ export function TeamMembersTab() {
                                 )}
                             </div>
                         </CardHeader>
-                        <CardContent className="pt-4">
+                        <CardContent className="">
                             <div className="flex justify-between">
                                 <div>
-                                    <p className="text-sm font-medium">Position</p>
-                                    <p className="text-sm text-gray-500">{member.position?.name || 'No Position'}</p>
+                                    <p className="text-sm font-medium">Email</p>
+                                    <p className="text-sm text-black">{member.email}</p>
                                 </div>
-                                <div>
-                                    <p className="text-sm font-medium">Joined</p>
-                                    <p className="text-sm text-gray-500">
-                                        {member.createdAt
-                                            ? formatDistanceToNow(new Date(member.createdAt), { addSuffix: true })
-                                            : 'Unknown'}
-                                    </p>
-                                </div>
+                                <Button asChild variant="ghost" size="sm" className="rounded-[4px] px-4 py-5 bg-[#2A1C1B] hover:bg-[#2A1C1B] hover:text-white text-white">
+                                    <Link href={`/team/edit/${member._id}`}>
+                                        View & Edit
+                                    </Link>
+                                </Button>
                             </div>
                         </CardContent>
-                        <CardFooter className="border-t bg-gray-50 flex justify-end">
-                            <Button asChild variant="ghost" size="sm">
-                                <Link href={`/team/edit/${member._id}`}>
-                                    View & Edit
-                                </Link>
-                            </Button>
-                        </CardFooter>
                     </Card>
                 ))}
 

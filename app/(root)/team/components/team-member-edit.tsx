@@ -13,12 +13,14 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useState, useCallback, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ImagePlus, Loader2, ArrowLeft, Trash2, AlertTriangle, CheckCircle, X, Plus } from "lucide-react";
+import { ImagePlus, Loader2, ArrowLeft, Trash2, AlertTriangle, CheckCircle, X, Plus, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getQueryClient } from "@/lib/get-query-client";
 import { toast } from "sonner";
 import { TeamMember } from "@/lib/types/teams.types";
+import { formatDistanceToNow } from "date-fns";
+import { Textarea } from "@/components/ui/textarea";
 import {
     Dialog,
     DialogContent,
@@ -36,6 +38,10 @@ const teamMemberFormSchema = z.object({
     positionId: z.string().min(1, "Position is required"),
     profilePicture: z.string().optional(),
     accountsManaged: z.array(z.string()).optional(),
+    notification: z.object({
+        title: z.string().optional(),
+        message: z.string().optional(),
+    }).optional(),
 });
 
 export function TeamMemberEdit({ id }: { id: string }) {
@@ -47,6 +53,7 @@ export function TeamMemberEdit({ id }: { id: string }) {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [managedVendorIds, setManagedVendorIds] = useState<string[]>([]);
     const [addVendorDialogOpen, setAddVendorDialogOpen] = useState(false);
+    const [notificationDialogOpen, setNotificationDialogOpen] = useState(false);
 
     const teamMembers = queryClient.getQueryData(['team-members']) as TeamMember[]
 
@@ -149,6 +156,50 @@ export function TeamMemberEdit({ id }: { id: string }) {
         }
     });
 
+    const sendNotificationMutation = useMutation({
+        mutationFn: (data: { title: string, message: string }) => {
+            return fetch('/api/notifications', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    recipientId: id,
+                    title: data.title,
+                    message: data.message,
+                }),
+            }).then(res => {
+                if (!res.ok) {
+                    throw new Error('Failed to send notification');
+                }
+                return res.json();
+            });
+        },
+        onSuccess: () => {
+            toast("Notification sent", {
+                description: "The notification has been sent successfully.",
+                icon: <CheckCircle className="h-5 w-5 text-green-500" />,
+                descriptionClassName: "description-class",
+                classNames: {
+                    title: "title-class",
+                    description: "description-class"
+                }
+            });
+            setNotificationDialogOpen(false);
+        },
+        onError: (error: any) => {
+            toast("Error", {
+                description: "Failed to send notification",
+                icon: <AlertTriangle className="h-5 w-5 text-red-500" />,
+                descriptionClassName: "description-class",
+                classNames: {
+                    title: "title-class",
+                    description: "description-class"
+                }
+            });
+        }
+    });
+
     // Form for editing a team member
     const form = useForm<z.infer<typeof teamMemberFormSchema>>({
         resolver: zodResolver(teamMemberFormSchema),
@@ -159,6 +210,10 @@ export function TeamMemberEdit({ id }: { id: string }) {
             positionId: teamMember?.positionId || "",
             profilePicture: teamMember?.profilePicture || "",
             accountsManaged: managedVendorIds,
+            notification: {
+                title: "",
+                message: "",
+            }
         }
     });
 
@@ -172,6 +227,10 @@ export function TeamMemberEdit({ id }: { id: string }) {
                 positionId: teamMember.position._id,
                 profilePicture: teamMember.profilePicture || "",
                 accountsManaged: teamMember.accountsManaged || [],
+                notification: {
+                    title: "",
+                    message: "",
+                }
             });
 
             if (teamMember.profilePicture) {
@@ -193,10 +252,31 @@ export function TeamMemberEdit({ id }: { id: string }) {
             delete data.password;
         }
 
+        // Remove notification data
+        delete data.notification;
+
         // Ensure accountsManaged is included from state
         data.accountsManaged = managedVendorIds;
 
         updateTeamMemberMutation.mutate(data);
+    };
+
+    const sendNotification = (e: React.FormEvent) => {
+        e.preventDefault();
+        const notificationData = form.getValues("notification");
+
+        if (!notificationData?.title || !notificationData?.message) {
+            toast("Error", {
+                description: "Please provide both title and message for the notification",
+                icon: <AlertTriangle className="h-5 w-5 text-red-500" />,
+            });
+            return;
+        }
+
+        sendNotificationMutation.mutate({
+            title: notificationData.title!,
+            message: notificationData.message!,
+        });
     };
 
     const addVendorToManaged = (vendorId: string) => {
@@ -273,7 +353,8 @@ export function TeamMemberEdit({ id }: { id: string }) {
     }
 
     return (
-        <>
+        <div className="w-full px-6 py-6">
+            <h1 className="text-2xl font-bold mb-6">Edit Team Member: {teamMember.name}</h1>
             <div className="mb-6">
                 <Button variant="outline" size="sm" asChild>
                     <Link href="/team" className="flex items-center gap-2">
@@ -284,16 +365,14 @@ export function TeamMemberEdit({ id }: { id: string }) {
             </div>
 
             <Card>
-                <CardHeader>
-                    <CardTitle>Edit Team Member</CardTitle>
-                </CardHeader>
-                <CardContent>
+                <CardContent className="p-0">
                     <Form {...form}>
-                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                            <div className="flex flex-col md:flex-row gap-6">
-                                <div className="md:w-1/3 flex flex-col items-center">
-                                    <div className="mb-4">
-                                        <Avatar className="w-32 h-32 border">
+                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-0">
+                            {/* Header Section with Image and Position Info */}
+                            <div className="p-6 flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-200 shadow-[0px_1px_0px_0px_rgba(0,0,0,0.1)]">
+                                <div className="flex items-center gap-4">
+                                    <div className="relative">
+                                        <Avatar className="w-24 h-24 border">
                                             {previewImage ? (
                                                 <AvatarImage src={previewImage} alt="Preview" />
                                             ) : (
@@ -308,38 +387,99 @@ export function TeamMemberEdit({ id }: { id: string }) {
                                                 )
                                             )}
                                         </Avatar>
-                                    </div>
 
-                                    <div className="relative">
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            className="flex items-center gap-2"
-                                            disabled={uploadingImage}
-                                        >
-                                            {uploadingImage ? (
-                                                <>
-                                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                                    Uploading...
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <ImagePlus className="h-4 w-4" />
-                                                    Change Image
-                                                </>
-                                            )}
-                                        </Button>
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            className="absolute inset-0 opacity-0 cursor-pointer"
-                                            onChange={handleImageUpload}
-                                            disabled={uploadingImage}
-                                        />
+                                        <div className="absolute -bottom-2 -right-2">
+                                            <div className="relative">
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="icon"
+                                                    className="rounded-full h-8 w-8 bg-white shadow-md border-gray-200"
+                                                    disabled={uploadingImage}
+                                                >
+                                                    {uploadingImage ? (
+                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                    ) : (
+                                                        <ImagePlus className="h-4 w-4" />
+                                                    )}
+                                                </Button>
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    className="absolute inset-0 opacity-0 cursor-pointer"
+                                                    onChange={handleImageUpload}
+                                                    disabled={uploadingImage}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <h3 className="font-medium">{teamMember.name}</h3>
+                                        <p className="text-sm text-gray-500">
+                                            {teamMember.position?.name || 'No Position'}
+                                        </p>
                                     </div>
                                 </div>
 
-                                <div className="md:w-2/3 space-y-4">
+                                <div className="flex flex-col items-end mt-4 ml-auto md:mt-0">
+                                    <div className="flex items-center mb-2">
+                                        <p className="text-sm font-medium mr-1">Joined</p>
+                                        <p className="text-sm text-gray-500">
+                                            {teamMember.createdAt
+                                                ? formatDistanceToNow(new Date(teamMember.createdAt), { addSuffix: true })
+                                                : 'Unknown'}
+                                        </p>
+                                    </div>
+                                    <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                                        <DialogTrigger asChild>
+                                            <Button
+                                                type="button"
+                                                variant="destructive"
+                                                size="sm"
+                                                className="flex items-center gap-2"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                                Delete Member
+                                            </Button>
+                                        </DialogTrigger>
+                                        <DialogContent>
+                                            <DialogHeader>
+                                                <DialogTitle>Delete Team Member</DialogTitle>
+                                                <DialogDescription>
+                                                    Are you sure you want to delete this team member? This action cannot be undone.
+                                                </DialogDescription>
+                                            </DialogHeader>
+                                            <DialogFooter>
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={() => setDeleteDialogOpen(false)}
+                                                >
+                                                    Cancel
+                                                </Button>
+                                                <Button
+                                                    variant="destructive"
+                                                    onClick={handleDelete}
+                                                    disabled={deleteTeamMemberMutation.isPending}
+                                                >
+                                                    {deleteTeamMemberMutation.isPending ? (
+                                                        <>
+                                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                            Deleting...
+                                                        </>
+                                                    ) : (
+                                                        'Delete'
+                                                    )}
+                                                </Button>
+                                            </DialogFooter>
+                                        </DialogContent>
+                                    </Dialog>
+                                </div>
+                            </div>
+
+                            {/* Basic Info Section */}
+                            <div className="p-6 space-y-4 border-b border-gray-200 shadow-[0px_1px_0px_0px_rgba(0,0,0,0.1)]">
+                                <h3 className="font-medium">Basic Information</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FormField
                                         control={form.control}
                                         name="name"
@@ -347,7 +487,7 @@ export function TeamMemberEdit({ id }: { id: string }) {
                                             <FormItem>
                                                 <FormLabel>Full Name</FormLabel>
                                                 <FormControl>
-                                                    <Input placeholder="John Doe" {...field} />
+                                                    <Input className='rounded-[4px] px-4 py-5 bg-[#E8E4E1] border border-[#44312D]' placeholder="John Doe" {...field} />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>
@@ -361,7 +501,7 @@ export function TeamMemberEdit({ id }: { id: string }) {
                                             <FormItem>
                                                 <FormLabel>Email</FormLabel>
                                                 <FormControl>
-                                                    <Input placeholder="john@example.com" type="email" {...field} />
+                                                    <Input className='rounded-[4px] px-4 py-5 bg-[#E8E4E1] border border-[#44312D]' placeholder="john@example.com" type="email" {...field} />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>
@@ -375,7 +515,7 @@ export function TeamMemberEdit({ id }: { id: string }) {
                                             <FormItem>
                                                 <FormLabel>Password</FormLabel>
                                                 <FormControl>
-                                                    <Input placeholder="Leave blank to keep current password" type="password" {...field} value={field.value || ''} />
+                                                    <Input className='rounded-[4px] px-4 py-5 bg-[#E8E4E1] border border-[#44312D]' placeholder="Leave blank to keep current password" type="password" {...field} value={field.value || ''} />
                                                 </FormControl>
                                                 <FormDescription>
                                                     Only enter a new password if you want to change it
@@ -397,7 +537,7 @@ export function TeamMemberEdit({ id }: { id: string }) {
                                                     defaultValue={field.value || ""}
                                                 >
                                                     <FormControl>
-                                                        <SelectTrigger>
+                                                        <SelectTrigger className="rounded-[4px] px-4 py-5 bg-[#E8E4E1] border border-[#44312D]">
                                                             <SelectValue placeholder="Select a position" />
                                                         </SelectTrigger>
                                                     </FormControl>
@@ -409,179 +549,229 @@ export function TeamMemberEdit({ id }: { id: string }) {
                                                         ))}
                                                     </SelectContent>
                                                 </Select>
+                                                <FormDescription>
+                                                    Select the team member's role in the organization
+                                                </FormDescription>
                                                 <FormMessage />
                                             </FormItem>
                                         )}
                                     />
-
-                                    <div className="space-y-3">
-                                        <FormLabel>Vendors Managed</FormLabel>
-                                        <FormDescription>
-                                            Select the vendors this team member can manage
-                                        </FormDescription>
-
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                                            {/* Display managed vendors */}
-                                            {managedVendors.map((vendor: any) => (
-                                                <div key={vendor._id} className="flex flex-col items-center">
-                                                    <div className="relative">
-                                                        <Avatar className="h-16 w-16 border">
-                                                            {vendor.logo ? (
-                                                                <AvatarImage src={vendor.logo} alt={vendor.name} />
-                                                            ) : (
-                                                                <AvatarFallback className="text-lg">
-                                                                    {vendor.name?.substring(0, 2).toUpperCase() || 'VN'}
-                                                                </AvatarFallback>
-                                                            )}
-                                                        </Avatar>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => removeVendorFromManaged(vendor._id)}
-                                                            className="absolute -top-2 -right-2 bg-red-500 rounded-full p-1 shadow-md hover:bg-red-600 transition-colors"
-                                                        >
-                                                            <X className="h-3 w-3 text-white" />
-                                                        </button>
-                                                    </div>
-                                                    <span className="mt-2 text-sm font-medium text-center line-clamp-2">
-                                                        {vendor.name}
-                                                    </span>
-                                                </div>
-                                            ))}
-
-                                            {/* Add vendor button */}
-                                            <Dialog open={addVendorDialogOpen} onOpenChange={setAddVendorDialogOpen}>
-                                                <DialogTrigger asChild>
-                                                    <div className="flex flex-col items-center cursor-pointer">
-                                                        <div className="h-16 w-16 rounded-full border border-dashed border-gray-300 flex items-center justify-center hover:border-gray-400 transition-colors">
-                                                            <Plus className="h-6 w-6 text-gray-400" />
-                                                        </div>
-                                                        <span className="mt-2 text-sm font-medium text-gray-500">
-                                                            Add Vendor
-                                                        </span>
-                                                    </div>
-                                                </DialogTrigger>
-                                                <DialogContent className="sm:max-w-md">
-                                                    <DialogHeader>
-                                                        <DialogTitle>Add Vendor</DialogTitle>
-                                                        <DialogDescription>
-                                                            Select a vendor to add to the list of managed vendors.
-                                                        </DialogDescription>
-                                                    </DialogHeader>
-                                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4 max-h-[50vh] overflow-y-auto p-1">
-                                                        {unmanagedVendors.length > 0 ? (
-                                                            unmanagedVendors.map((vendor: any) => (
-                                                                <div
-                                                                    key={vendor._id}
-                                                                    className="flex flex-col items-center cursor-pointer hover:bg-gray-100 rounded-md p-2 transition-colors"
-                                                                    onClick={() => addVendorToManaged(vendor._id)}
-                                                                >
-                                                                    <Avatar className="h-16 w-16 border">
-                                                                        {vendor.logo ? (
-                                                                            <AvatarImage src={vendor.logo} alt={vendor.name} />
-                                                                        ) : (
-                                                                            <AvatarFallback className="text-lg">
-                                                                                {vendor.name?.substring(0, 2).toUpperCase() || 'VN'}
-                                                                            </AvatarFallback>
-                                                                        )}
-                                                                    </Avatar>
-                                                                    <span className="mt-2 text-sm font-medium text-center line-clamp-2">
-                                                                        {vendor.name}
-                                                                    </span>
-                                                                </div>
-                                                            ))
-                                                        ) : (
-                                                            <p className="text-sm text-muted-foreground col-span-full text-center py-4">
-                                                                No additional vendors available to add
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                    <DialogFooter className="sm:justify-end">
-                                                        <Button
-                                                            type="button"
-                                                            variant="secondary"
-                                                            onClick={() => setAddVendorDialogOpen(false)}
-                                                        >
-                                                            Cancel
-                                                        </Button>
-                                                    </DialogFooter>
-                                                </DialogContent>
-                                            </Dialog>
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
 
-                            <div className="flex justify-between gap-3">
-                                <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-                                    <DialogTrigger asChild>
-                                        <Button
-                                            type="button"
-                                            variant="destructive"
-                                            className="flex items-center gap-2"
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                            Delete Team Member
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                        <DialogHeader>
-                                            <DialogTitle>Delete Team Member</DialogTitle>
-                                            <DialogDescription>
-                                                Are you sure you want to delete this team member? This action cannot be undone.
-                                            </DialogDescription>
-                                        </DialogHeader>
-                                        <DialogFooter>
+                            {/* Accounts Managed Section */}
+                            <div className="p-6 space-y-4 border-b border-gray-200 shadow-[0px_1px_0px_0px_rgba(0,0,0,0.1)]">
+                                <div className="flex justify-between items-center">
+                                    <h3 className="font-medium">Accounts Managed</h3>
+                                    <Dialog open={addVendorDialogOpen} onOpenChange={setAddVendorDialogOpen}>
+                                        <DialogTrigger asChild>
                                             <Button
+                                                type="button"
                                                 variant="outline"
-                                                onClick={() => setDeleteDialogOpen(false)}
+                                                size="sm"
+                                                className="rounded-full"
                                             >
-                                                Cancel
+                                                <Plus className="h-4 w-4 mr-1" />
+                                                Add Vendor
                                             </Button>
-                                            <Button
-                                                variant="destructive"
-                                                onClick={handleDelete}
-                                                disabled={deleteTeamMemberMutation.isPending}
-                                            >
-                                                {deleteTeamMemberMutation.isPending ? (
-                                                    <>
-                                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                        Deleting...
-                                                    </>
+                                        </DialogTrigger>
+                                        <DialogContent className="sm:max-w-md">
+                                            <DialogHeader>
+                                                <DialogTitle>Add Vendor</DialogTitle>
+                                                <DialogDescription>
+                                                    Select a vendor to add to the list of managed vendors.
+                                                </DialogDescription>
+                                            </DialogHeader>
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4 max-h-[50vh] overflow-y-auto p-1">
+                                                {unmanagedVendors.length > 0 ? (
+                                                    unmanagedVendors.map((vendor: any) => (
+                                                        <div
+                                                            key={vendor._id}
+                                                            className="flex flex-col items-center cursor-pointer hover:bg-gray-100 rounded-md p-2 transition-colors"
+                                                            onClick={() => addVendorToManaged(vendor._id)}
+                                                        >
+                                                            <Avatar className="h-16 w-16 border">
+                                                                {vendor.logo ? (
+                                                                    <AvatarImage src={vendor.logo} alt={vendor.name} />
+                                                                ) : (
+                                                                    <AvatarFallback className="text-lg">
+                                                                        {vendor.name?.substring(0, 2).toUpperCase() || 'VN'}
+                                                                    </AvatarFallback>
+                                                                )}
+                                                            </Avatar>
+                                                            <span className="mt-2 text-sm font-medium text-center line-clamp-2">
+                                                                {vendor.name}
+                                                            </span>
+                                                        </div>
+                                                    ))
                                                 ) : (
-                                                    'Delete'
+                                                    <p className="text-sm text-muted-foreground col-span-full text-center py-4">
+                                                        No additional vendors available to add
+                                                    </p>
                                                 )}
-                                            </Button>
-                                        </DialogFooter>
-                                    </DialogContent>
-                                </Dialog>
-
-                                <div className="flex gap-3 ml-auto">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => router.push('/team')}
-                                    >
-                                        Cancel
-                                    </Button>
-                                    <Button
-                                        type="submit"
-                                        disabled={updateTeamMemberMutation.isPending}
-                                    >
-                                        {updateTeamMemberMutation.isPending ? (
-                                            <>
-                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                Updating...
-                                            </>
-                                        ) : (
-                                            'Save Changes'
-                                        )}
-                                    </Button>
+                                            </div>
+                                            <DialogFooter className="sm:justify-end">
+                                                <Button
+                                                    type="button"
+                                                    variant="secondary"
+                                                    onClick={() => setAddVendorDialogOpen(false)}
+                                                >
+                                                    Cancel
+                                                </Button>
+                                            </DialogFooter>
+                                        </DialogContent>
+                                    </Dialog>
                                 </div>
+
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                                    {managedVendors.length > 0 ? (
+                                        managedVendors.map((vendor: any) => (
+                                            <div key={vendor._id} className="flex flex-col items-center">
+                                                <div className="relative">
+                                                    <Avatar className="h-16 w-16 border">
+                                                        {vendor.logo ? (
+                                                            <AvatarImage src={vendor.logo} alt={vendor.name} />
+                                                        ) : (
+                                                            <AvatarFallback className="text-lg">
+                                                                {vendor.name?.substring(0, 2).toUpperCase() || 'VN'}
+                                                            </AvatarFallback>
+                                                        )}
+                                                    </Avatar>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeVendorFromManaged(vendor._id)}
+                                                        className="absolute -top-2 -right-2 bg-red-500 rounded-full p-1 shadow-md hover:bg-red-600 transition-colors"
+                                                    >
+                                                        <X className="h-3 w-3 text-white" />
+                                                    </button>
+                                                </div>
+                                                <span className="mt-2 text-sm font-medium text-center line-clamp-2">
+                                                    {vendor.name}
+                                                </span>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="text-sm text-muted-foreground col-span-full">
+                                            No vendors are currently being managed by this team member.
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Send Notification Section */}
+                            <div className="p-6 space-y-4">
+                                <div className="flex justify-between items-center">
+                                    <h3 className="font-medium">Send Notification</h3>
+                                    <Dialog open={notificationDialogOpen} onOpenChange={setNotificationDialogOpen}>
+                                        <DialogTrigger asChild>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                            >
+                                                <Send className="h-4 w-4 mr-1" />
+                                                Compose Message
+                                            </Button>
+                                        </DialogTrigger>
+                                        <DialogContent>
+                                            <DialogHeader>
+                                                <DialogTitle>Send Notification to {teamMember.name}</DialogTitle>
+                                                <DialogDescription>
+                                                    This notification will be sent immediately to the team member.
+                                                </DialogDescription>
+                                            </DialogHeader>
+                                            <div className="space-y-4 py-2">
+                                                <FormField
+                                                    control={form.control}
+                                                    name="notification.title"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel>Title</FormLabel>
+                                                            <FormControl>
+                                                                <Input placeholder="Notification title" {...field} />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                                <FormField
+                                                    control={form.control}
+                                                    name="notification.message"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel>Message</FormLabel>
+                                                            <FormControl>
+                                                                <Textarea
+                                                                    placeholder="Enter your message here"
+                                                                    className="min-h-[100px]"
+                                                                    {...field}
+                                                                />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                            </div>
+                                            <DialogFooter>
+                                                <Button
+                                                    type="button"
+                                                    variant="secondary"
+                                                    onClick={() => setNotificationDialogOpen(false)}
+                                                >
+                                                    Cancel
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    onClick={sendNotification}
+                                                    disabled={sendNotificationMutation.isPending}
+                                                >
+                                                    {sendNotificationMutation.isPending ? (
+                                                        <>
+                                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                            Sending...
+                                                        </>
+                                                    ) : (
+                                                        'Send Notification'
+                                                    )}
+                                                </Button>
+                                            </DialogFooter>
+                                        </DialogContent>
+                                    </Dialog>
+                                </div>
+                                <p className="text-sm text-gray-500">
+                                    Send a direct notification to this team member. They will receive it immediately on their dashboard and via email.
+                                </p>
+                            </div>
+
+                            {/* Form Actions */}
+                            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="rounded-[4px] px-4 py-5 bg-gray-200 min-w-[180px] text-black"
+                                    onClick={() => router.push('/team')}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    className="rounded-[4px] px-4 py-5 bg-[#2A1C1B] min-w-[180px] text-white"
+                                    disabled={updateTeamMemberMutation.isPending}
+                                >
+                                    {updateTeamMemberMutation.isPending ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Updating...
+                                        </>
+                                    ) : (
+                                        'Save Changes'
+                                    )}
+                                </Button>
                             </div>
                         </form>
                     </Form>
                 </CardContent>
             </Card>
-        </>
+        </div>
     );
 } 

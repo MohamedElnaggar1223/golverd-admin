@@ -203,7 +203,7 @@ export function NewTeamMemberTab() {
                                         <FormItem>
                                             <FormLabel>Full Name</FormLabel>
                                             <FormControl>
-                                                <Input placeholder="John Doe" {...field} />
+                                                <Input className='rounded-[4px] px-4 py-5 bg-[#E8E4E1] border border-[#44312D]' placeholder="John Doe" {...field} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -217,7 +217,7 @@ export function NewTeamMemberTab() {
                                         <FormItem>
                                             <FormLabel>Email</FormLabel>
                                             <FormControl>
-                                                <Input placeholder="john@example.com" type="email" {...field} />
+                                                <Input className='rounded-[4px] px-4 py-5 bg-[#E8E4E1] border border-[#44312D]' placeholder="john@example.com" type="email" {...field} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -231,7 +231,7 @@ export function NewTeamMemberTab() {
                                         <FormItem>
                                             <FormLabel>Password</FormLabel>
                                             <FormControl>
-                                                <Input placeholder="********" type="password" {...field} />
+                                                <Input className='rounded-[4px] px-4 py-5 bg-[#E8E4E1] border border-[#44312D]' placeholder="********" type="password" {...field} />
                                             </FormControl>
                                             <FormDescription>
                                                 Must be at least 8 characters
@@ -252,7 +252,7 @@ export function NewTeamMemberTab() {
                                                 defaultValue={field.value}
                                             >
                                                 <FormControl>
-                                                    <SelectTrigger>
+                                                    <SelectTrigger className="rounded-[4px] px-4 py-5 bg-[#E8E4E1] border border-[#44312D]">
                                                         <SelectValue placeholder="Select a position" />
                                                     </SelectTrigger>
                                                 </FormControl>
@@ -274,15 +274,16 @@ export function NewTeamMemberTab() {
                         <div className="flex justify-end">
                             <Button
                                 type="submit"
+                                className="rounded-[4px] px-4 py-5 bg-[#2A1C1B] lg:min-w-[280px] text-white"
                                 disabled={createTeamMemberMutation.isPending}
                             >
                                 {createTeamMemberMutation.isPending ? (
                                     <>
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        Creating...
+                                        Adding...
                                     </>
                                 ) : (
-                                    'Create Team Member'
+                                    'Add Team Member'
                                 )}
                             </Button>
                         </div>

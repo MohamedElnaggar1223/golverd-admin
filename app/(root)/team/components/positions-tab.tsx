@@ -15,6 +15,9 @@ import { useState } from "react";
 import { Edit, Plus, Trash2, Loader2 } from "lucide-react";
 import { getQueryClient } from "@/lib/get-query-client";
 import { toast } from "sonner";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 const positionFormSchema = z.object({
     name: z.string().min(1, "Position name is required"),
@@ -37,39 +40,14 @@ const positionFormSchema = z.object({
 });
 
 export function PositionsTab() {
+    const router = useRouter();
     const queryClient = getQueryClient()
-    const [isAddPositionOpen, setIsAddPositionOpen] = useState(false);
-    const [isEditPositionOpen, setIsEditPositionOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [currentPosition, setCurrentPosition] = useState<any>(null);
 
     const { data: positions } = useSuspenseQuery({
         queryKey: ['positions'],
         queryFn: getPositions
-    });
-
-    // Create position mutation
-    const createPositionMutation = useMutation({
-        mutationFn: createPosition,
-        onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: ['positions'] });
-        },
-        onSuccess: () => {
-            setIsAddPositionOpen(false);
-            form.reset();
-        }
-    });
-
-    // Update position mutation
-    const updatePositionMutation = useMutation({
-        mutationFn: (data: { id: string; data: any }) =>
-            updatePosition(data.id, data.data),
-        onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: ['positions'] });
-        },
-        onSuccess: () => {
-            setIsEditPositionOpen(false);
-        }
     });
 
     // Delete position mutation
@@ -93,79 +71,6 @@ export function PositionsTab() {
         }
     });
 
-    // Form for adding a new position
-    const form = useForm<z.infer<typeof positionFormSchema>>({
-        resolver: zodResolver(positionFormSchema),
-        defaultValues: {
-            name: "",
-            permissions: {
-                viewAll: false,
-                viewDashboard: true,
-                viewTeamMembers: false,
-                viewVendors: false,
-                viewOrders: false,
-                viewAppointments: false,
-                viewFinancialCenter: false,
-                viewUsers: false,
-                editAll: false,
-                editTeamMembers: false,
-                editVendors: false,
-                editOrders: false,
-                editAppointments: false,
-                editFinancialCenter: false,
-            }
-        }
-    });
-
-    // Form for editing a position
-    const editForm = useForm<z.infer<typeof positionFormSchema>>({
-        resolver: zodResolver(positionFormSchema),
-        defaultValues: {
-            name: "",
-            permissions: {
-                viewAll: false,
-                viewDashboard: true,
-                viewTeamMembers: false,
-                viewVendors: false,
-                viewOrders: false,
-                viewAppointments: false,
-                viewFinancialCenter: false,
-                viewUsers: false,
-                editAll: false,
-                editTeamMembers: false,
-                editVendors: false,
-                editOrders: false,
-                editAppointments: false,
-                editFinancialCenter: false,
-            }
-        }
-    });
-
-    function onSubmit(values: z.infer<typeof positionFormSchema>) {
-        // Directly pass as Record<string, boolean>
-        createPositionMutation.mutate(values);
-    }
-
-    function onEdit(values: z.infer<typeof positionFormSchema>) {
-        if (currentPosition) {
-            updatePositionMutation.mutate({
-                id: currentPosition._id,
-                data: values
-            });
-        }
-    }
-
-    function handleEditPosition(position: any) {
-        setCurrentPosition(position);
-        editForm.reset({
-            name: position.name,
-            permissions: {
-                ...position.permissions
-            }
-        });
-        setIsEditPositionOpen(true);
-    }
-
     function handleDeletePosition(position: any) {
         setCurrentPosition(position);
         setIsDeleteDialogOpen(true);
@@ -175,59 +80,71 @@ export function PositionsTab() {
         <div className="space-y-6">
             <div className="flex justify-end">
                 <Button
-                    onClick={() => setIsAddPositionOpen(true)}
+                    asChild
                     className="flex items-center gap-1"
                 >
-                    <Plus className="h-4 w-4" />
-                    Add Position
+                    <Link href="/team/create-position">
+                        <Plus className="h-4 w-4" />
+                        Add Position
+                    </Link>
                 </Button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {positions?.map((position: any) => (
-                    <Card key={position._id}>
-                        <CardHeader>
-                            <CardTitle>{position.name}</CardTitle>
+                    <Card key={position._id} className="overflow-hidden rounded-[4px] w-fit min-w-[370px] py-4">
+                        <CardHeader className="pb-0 border-b border-gray-200 shadow-[0px_1px_0px_0px_rgba(0,0,0,0.1)]">
+                            <div className="flex justify-between items-start">
+                                <div className="flex items-center gap-4">
+                                    <Avatar className="h-16 w-16">
+                                        <AvatarFallback className='bg-[#E8E4E1]'>
+                                            {position.name.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                        <h3 className="font-medium">{position.name}</h3>
+                                    </div>
+                                </div>
+                            </div>
                         </CardHeader>
-                        <CardContent>
-                            <div className="space-y-2">
-                                <h4 className="text-sm font-medium">Permissions:</h4>
-                                <ul className="text-sm text-gray-500 space-y-1 pl-5 list-disc">
-                                    {position.permissions.viewAll && <li>View All</li>}
-                                    {position.permissions.viewDashboard && <li>View Dashboard</li>}
-                                    {position.permissions.viewTeamMembers && <li>View Team Members</li>}
-                                    {position.permissions.viewVendors && <li>View Vendors</li>}
-                                    {position.permissions.viewOrders && <li>View Orders</li>}
-                                    {position.permissions.viewAppointments && <li>View Appointments</li>}
-                                    {position.permissions.viewFinancialCenter && <li>View Financial Center</li>}
-                                    {position.permissions.viewUsers && <li>View Users</li>}
-                                    {position.permissions.editAll && <li>Edit All</li>}
-                                    {position.permissions.editTeamMembers && <li>Edit Team Members</li>}
-                                    {position.permissions.editVendors && <li>Edit Vendors</li>}
-                                    {position.permissions.editOrders && <li>Edit Orders</li>}
-                                    {position.permissions.editAppointments && <li>Edit Appointments</li>}
-                                    {position.permissions.editFinancialCenter && <li>Edit Financial Center</li>}
-                                </ul>
+                        <CardContent className="">
+                            <div className="flex justify-between">
+                                <div>
+                                    <p className="text-sm font-medium">Allowed Access</p>
+                                    <p className="text-sm text-black">
+                                        {Object.entries(position.permissions)
+                                            .filter(([_, value]) => value === true)
+                                            .map(([key]) => key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()))
+                                            .slice(0, 1)[0] || 'No Access'}
+                                        {Object.entries(position.permissions).filter(([_, value]) => value === true).length > 1 &&
+                                            <span className="text-gray-500 ml-1">+{Object.entries(position.permissions).filter(([_, value]) => value === true).length - 1} more</span>
+                                        }
+                                    </p>
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        asChild
+                                        className="rounded-[4px] px-4 py-5 bg-[#2A1C1B] hover:bg-[#2A1C1B] hover:text-white text-white"
+                                    >
+                                        <Link href={`/team/edit-position/${position._id}`}>
+                                            <Edit className="h-4 w-4 mr-1" />
+                                            Edit
+                                        </Link>
+                                    </Button>
+                                    <Button
+                                        variant="destructive"
+                                        size="sm"
+                                        onClick={() => handleDeletePosition(position)}
+                                        className="rounded-[4px] px-4 py-5"
+                                    >
+                                        <Trash2 className="h-4 w-4 mr-1" />
+                                        Delete
+                                    </Button>
+                                </div>
                             </div>
                         </CardContent>
-                        <CardFooter className="flex justify-end gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleEditPosition(position)}
-                            >
-                                <Edit className="h-4 w-4 mr-1" />
-                                Edit
-                            </Button>
-                            <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => handleDeletePosition(position)}
-                            >
-                                <Trash2 className="h-4 w-4 mr-1" />
-                                Delete
-                            </Button>
-                        </CardFooter>
                     </Card>
                 ))}
 
@@ -237,558 +154,6 @@ export function PositionsTab() {
                     </div>
                 )}
             </div>
-
-            {/* Add Position Dialog */}
-            <Dialog open={isAddPositionOpen} onOpenChange={setIsAddPositionOpen}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Add Position</DialogTitle>
-                        <DialogDescription>
-                            Create a new position and set its permissions.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <Form {...form}>
-                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                            <FormField
-                                control={form.control}
-                                name="name"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Position Name</FormLabel>
-                                        <FormControl>
-                                            <Input {...field} placeholder="e.g., Manager" />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-
-                            <div className="space-y-4">
-                                <h3 className="text-sm font-medium">Permissions</h3>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    <FormField
-                                        control={form.control}
-                                        name="permissions.viewAll"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-start space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">View All</FormLabel>
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={form.control}
-                                        name="permissions.viewDashboard"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-start space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">View Dashboard</FormLabel>
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={form.control}
-                                        name="permissions.viewTeamMembers"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-start space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">View Team Members</FormLabel>
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={form.control}
-                                        name="permissions.viewVendors"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-start space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">View Vendors</FormLabel>
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={form.control}
-                                        name="permissions.viewOrders"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-start space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">View Orders</FormLabel>
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={form.control}
-                                        name="permissions.viewAppointments"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-start space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">View Appointments</FormLabel>
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={form.control}
-                                        name="permissions.viewFinancialCenter"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-start space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">View Financial Center</FormLabel>
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={form.control}
-                                        name="permissions.viewUsers"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-start space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">View Users</FormLabel>
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={form.control}
-                                        name="permissions.editAll"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-start space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">Edit All</FormLabel>
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={form.control}
-                                        name="permissions.editTeamMembers"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-start space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">Edit Team Members</FormLabel>
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={form.control}
-                                        name="permissions.editVendors"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-start space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">Edit Vendors</FormLabel>
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={form.control}
-                                        name="permissions.editOrders"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-start space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">Edit Orders</FormLabel>
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={form.control}
-                                        name="permissions.editAppointments"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-start space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">Edit Appointments</FormLabel>
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={form.control}
-                                        name="permissions.editFinancialCenter"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-start space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">Edit Financial Center</FormLabel>
-                                            </FormItem>
-                                        )}
-                                    />
-                                </div>
-                            </div>
-
-                            <DialogFooter>
-                                <Button
-                                    type="submit"
-                                    disabled={createPositionMutation.isPending}
-                                >
-                                    {createPositionMutation.isPending ? (
-                                        <>
-                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                            Creating...
-                                        </>
-                                    ) : (
-                                        'Create Position'
-                                    )}
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </Form>
-                </DialogContent>
-            </Dialog>
-
-            {/* Edit Position Dialog */}
-            <Dialog open={isEditPositionOpen} onOpenChange={setIsEditPositionOpen}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Edit Position</DialogTitle>
-                        <DialogDescription>
-                            Modify the position and its permissions.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <Form {...editForm}>
-                        <form onSubmit={editForm.handleSubmit(onEdit)} className="space-y-6">
-                            <FormField
-                                control={editForm.control}
-                                name="name"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Position Name</FormLabel>
-                                        <FormControl>
-                                            <Input {...field} placeholder="e.g., Manager" />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-
-                            <div className="space-y-4">
-                                <h3 className="text-sm font-medium">Permissions</h3>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    <FormField
-                                        control={editForm.control}
-                                        name="permissions.viewAll"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-start space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">View All</FormLabel>
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={editForm.control}
-                                        name="permissions.viewDashboard"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-start space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">View Dashboard</FormLabel>
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={editForm.control}
-                                        name="permissions.viewTeamMembers"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-start space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">View Team Members</FormLabel>
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={editForm.control}
-                                        name="permissions.viewVendors"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-start space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">View Vendors</FormLabel>
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={editForm.control}
-                                        name="permissions.viewOrders"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-start space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">View Orders</FormLabel>
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={editForm.control}
-                                        name="permissions.viewAppointments"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-start space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">View Appointments</FormLabel>
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={editForm.control}
-                                        name="permissions.viewFinancialCenter"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-start space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">View Financial Center</FormLabel>
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={editForm.control}
-                                        name="permissions.viewUsers"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-start space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">View Users</FormLabel>
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={editForm.control}
-                                        name="permissions.editAll"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-start space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">Edit All</FormLabel>
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={editForm.control}
-                                        name="permissions.editTeamMembers"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-start space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">Edit Team Members</FormLabel>
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={editForm.control}
-                                        name="permissions.editVendors"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-start space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">Edit Vendors</FormLabel>
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={editForm.control}
-                                        name="permissions.editOrders"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-start space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">Edit Orders</FormLabel>
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={editForm.control}
-                                        name="permissions.editAppointments"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-start space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">Edit Appointments</FormLabel>
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={editForm.control}
-                                        name="permissions.editFinancialCenter"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-start space-x-2 space-y-0">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <FormLabel className="font-normal text-sm">Edit Financial Center</FormLabel>
-                                            </FormItem>
-                                        )}
-                                    />
-                                </div>
-                            </div>
-
-                            <DialogFooter>
-                                <Button
-                                    type="submit"
-                                    disabled={updatePositionMutation.isPending}
-                                >
-                                    {updatePositionMutation.isPending ? (
-                                        <>
-                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                            Updating...
-                                        </>
-                                    ) : (
-                                        'Update Position'
-                                    )}
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </Form>
-                </DialogContent>
-            </Dialog>
 
             {/* Delete Position Confirmation Dialog */}
             <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

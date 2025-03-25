@@ -27,21 +27,19 @@ export default function TeamPage() {
 
     return (
         <div className="py-6 w-full px-6">
-            <h1 className="text-2xl font-bold mb-6">Team Management</h1>
-
             <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-                <TabsList className="grid w-full grid-cols-3 mb-8">
-                    <TabsTrigger value="members">Team Members</TabsTrigger>
-                    <TabsTrigger value="positions">Positions</TabsTrigger>
-                    <TabsTrigger value="new">Add Team Member</TabsTrigger>
+                <TabsList className="grid w-fit grid-cols-3 mb-8 bg-transparent">
+                    <TabsTrigger className='data-[state=active]:bg-[#44312D] data-[state=active]:text-white rounded-sm py-1.5 px-4 w-fit' value="members">Team Members</TabsTrigger>
+                    <TabsTrigger className='data-[state=active]:bg-[#44312D] data-[state=active]:text-white rounded-sm py-1.5 px-4 w-fit' value="positions">Positions</TabsTrigger>
+                    <TabsTrigger className='data-[state=active]:bg-[#44312D] data-[state=active]:text-white rounded-sm py-1.5 px-4 w-fit' value="new">Add Team Member</TabsTrigger>
                 </TabsList>
-                <TabsContent value="members" className="mt-0">
+                <TabsContent value="members" className="mt-0 w-full">
                     <TeamMembersTab />
                 </TabsContent>
-                <TabsContent value="positions" className="mt-0">
+                <TabsContent value="positions" className="mt-0 w-full">
                     <PositionsTab />
                 </TabsContent>
-                <TabsContent value="new" className="mt-0">
+                <TabsContent value="new" className="mt-0 w-full">
                     <NewTeamMemberTab />
                 </TabsContent>
             </Tabs>

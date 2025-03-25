@@ -7,6 +7,7 @@ import { AdminSidebar } from "@/components/shared/Sidebar";
 import Header from "@/components/shared/Header";
 import AuthProvider from "@/providers/session-provider";
 import { Toaster } from "@/components/ui/sonner"
+import NotificationProvider from '@/providers/notification-provider';
 
 const inter = Inter({
 	variable: "--font-geist-sans",
@@ -30,15 +31,17 @@ export default function RootLayout({
 				className={`${inter.variable} antialiased`}
 			>
 				<AuthProvider>
-					<Providers>
-						<SidebarProvider>
-							<AdminSidebar />
-							<main className='w-full bg-[#E8E4E1]'>
-								<Header />
-								{children}
-							</main>
-						</SidebarProvider>
-					</Providers>
+					<NotificationProvider>
+						<Providers>
+							<SidebarProvider>
+								<AdminSidebar />
+								<main className='w-full bg-[#E8E4E1]'>
+									<Header />
+									{children}
+								</main>
+							</SidebarProvider>
+						</Providers>
+					</NotificationProvider>
 				</AuthProvider>
 				<Toaster />
 			</body>
