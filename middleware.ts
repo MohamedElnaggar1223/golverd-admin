@@ -16,7 +16,7 @@ export async function middleware(req: NextRequest) {
     // Redirect logic
     if (isPublicPath && token) {
         // If user is authenticated and trying to access public path, redirect to dashboard
-        return NextResponse.redirect(new URL("/dashboard", req.url));
+        return NextResponse.redirect(new URL("/", req.url));
     }
 
     if (!isPublicPath && !token) {
@@ -30,7 +30,6 @@ export async function middleware(req: NextRequest) {
 // Add the paths you want to protect here
 export const config = {
     matcher: [
-        "/dashboard/:path*",
-        "/signin",
+        '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)'
     ],
 }; 
