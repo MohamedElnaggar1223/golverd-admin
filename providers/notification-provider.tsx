@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
 
@@ -23,6 +23,7 @@ interface NotificationContextType {
     loading: boolean;
     error: string | null;
     sseConnected: boolean;
+    connectionId: string | null;
     loadNotifications: () => Promise<void>;
     markAsRead: (notificationId: string) => Promise<void>;
     markAllAsRead: () => Promise<void>;
@@ -38,36 +39,57 @@ export default function NotificationProvider({ children }: { children: ReactNode
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [sseConnected, setSseConnected] = useState(false);
-    const [eventSource, setEventSource] = useState<EventSource | null>(null);
+    const [connectionId, setConnectionId] = useState<string | null>(null);
+    const [reconnectAttempts, setReconnectAttempts] = useState(0);
+    const eventSourceRef = useRef<EventSource | null>(null);
+    const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Clear any existing timeouts when unmounting
+    useEffect(() => {
+        return () => {
+            if (reconnectTimeoutRef.current) {
+                clearTimeout(reconnectTimeoutRef.current);
+            }
+        };
+    }, []);
 
     // Initialize SSE connection
     useEffect(() => {
-        if (status === 'authenticated' && session?.user?.id) {
+        if (status === 'authenticated' && session?.user?.email) {
+            console.log('Authentication detected, connecting to SSE...');
             connectSSE();
             loadNotifications();
 
             // Clean up on unmount
             return () => {
+                console.log('Component unmounting, disconnecting SSE...');
                 disconnectSSE();
             };
+        } else if (status === 'unauthenticated') {
+            console.log('User is not authenticated, no SSE connection');
+            disconnectSSE();
         }
     }, [status, session]);
 
     const connectSSE = () => {
-        if (eventSource) {
-            eventSource.close();
-        }
+        // Clean up existing connection first
+        disconnectSSE();
 
         try {
-            // Create new SSE connection
-            const sse = new EventSource('/api/sse');
-            setEventSource(sse);
+            console.log('Creating new SSE connection...');
+
+            // Create new SSE connection with unique cache-busting parameter
+            const timestamp = new Date().getTime();
+            const sse = new EventSource(`/api/sse?t=${timestamp}`);
+            eventSourceRef.current = sse;
 
             // Connection opened
             sse.onopen = () => {
                 console.log('SSE connection opened');
                 setSseConnected(true);
                 setError(null);
+                setReconnectAttempts(0);
+                toast.success('Connected to notification service', { id: 'sse-connection' });
             };
 
             // Handle messages
@@ -79,7 +101,8 @@ export default function NotificationProvider({ children }: { children: ReactNode
                     switch (data.type) {
                         case 'connection':
                             setSseConnected(true);
-                            console.log('SSE connected:', data.message);
+                            setConnectionId(data.connectionId);
+                            console.log('SSE connected with ID:', data.connectionId);
                             break;
 
                         case 'notification':
@@ -87,6 +110,15 @@ export default function NotificationProvider({ children }: { children: ReactNode
                             setNotifications(prev => [data.data, ...prev]);
                             // Increment unread count
                             setUnreadCount(prev => prev + 1);
+
+                            // Show toast notification
+                            toast.info(data.data.title, {
+                                description: data.data.message,
+                                action: {
+                                    label: 'View',
+                                    onClick: () => loadNotifications()
+                                }
+                            });
 
                             // Show browser notification if allowed
                             if ('Notification' in window && Notification.permission === 'granted') {
@@ -116,31 +148,74 @@ export default function NotificationProvider({ children }: { children: ReactNode
                 console.error('SSE connection error:', err);
                 setSseConnected(false);
                 setError('Lost connection to notification service');
+                setConnectionId(null);
 
-                // Close and retry connection after a delay
+                // Close connection
                 sse.close();
-                setTimeout(() => {
-                    connectSSE();
-                }, 5000);
+                eventSourceRef.current = null;
+
+                // Implement exponential backoff for reconnection
+                const maxAttempts = 10;
+                if (reconnectAttempts < maxAttempts) {
+                    const backoffTime = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+                    console.log(`Reconnecting in ${backoffTime / 1000} seconds (attempt ${reconnectAttempts + 1}/${maxAttempts})`);
+
+                    // Clear any existing timeout
+                    if (reconnectTimeoutRef.current) {
+                        clearTimeout(reconnectTimeoutRef.current);
+                    }
+
+                    // Set new timeout
+                    reconnectTimeoutRef.current = setTimeout(() => {
+                        setReconnectAttempts(prev => prev + 1);
+                        connectSSE();
+                    }, backoffTime);
+                } else {
+                    console.error('Maximum reconnection attempts reached');
+                    toast.error('Failed to reconnect to notification service', {
+                        description: 'Please refresh the page',
+                        id: 'sse-reconnect-failure',
+                        action: {
+                            label: 'Retry',
+                            onClick: () => {
+                                setReconnectAttempts(0);
+                                connectSSE();
+                            }
+                        }
+                    });
+                }
             };
 
         } catch (err) {
             console.error('Failed to initialize SSE:', err);
             setSseConnected(false);
+            setConnectionId(null);
             setError('Failed to connect to notification service');
+            toast.error('Failed to connect to notification service', { id: 'sse-init-error' });
         }
     };
 
     const disconnectSSE = () => {
-        if (eventSource) {
-            eventSource.close();
-            setEventSource(null);
+        // Clear any pending reconnect timeout
+        if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current);
+            reconnectTimeoutRef.current = null;
+        }
+
+        // Close the EventSource if it exists
+        if (eventSourceRef.current) {
+            console.log('Closing existing SSE connection...');
+            eventSourceRef.current.close();
+            eventSourceRef.current = null;
             setSseConnected(false);
+            setConnectionId(null);
         }
     };
 
     const reconnectSSE = () => {
+        toast.info('Reconnecting to notification service...', { id: 'sse-reconnect' });
         disconnectSSE();
+        setReconnectAttempts(0);
         connectSSE();
     };
 
@@ -235,6 +310,7 @@ export default function NotificationProvider({ children }: { children: ReactNode
                 loading,
                 error,
                 sseConnected,
+                connectionId,
                 loadNotifications,
                 markAsRead,
                 markAllAsRead,

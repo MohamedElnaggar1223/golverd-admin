@@ -224,7 +224,7 @@ export function TeamMemberEdit({ id }: { id: string }) {
                 name: teamMember.name,
                 email: teamMember.email,
                 password: undefined,
-                positionId: teamMember.position._id,
+                positionId: teamMember.position?._id,
                 profilePicture: teamMember.profilePicture || "",
                 accountsManaged: teamMember.accountsManaged || [],
                 notification: {
@@ -543,8 +543,8 @@ export function TeamMemberEdit({ id }: { id: string }) {
                                                     </FormControl>
                                                     <SelectContent>
                                                         {positions?.map((position: any) => (
-                                                            <SelectItem key={position._id} value={position._id}>
-                                                                {position.name}
+                                                            <SelectItem key={position?._id} value={position?._id}>
+                                                                {position?.name}
                                                             </SelectItem>
                                                         ))}
                                                     </SelectContent>

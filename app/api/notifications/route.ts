@@ -6,42 +6,54 @@ import { authOptions } from '@/lib/auth';
 import SuperUser from '@/models/SuperUser';
 import { sendNotification, updateUnreadCount } from '@/lib/actions/notifications-actions';
 
+// Helper function to get unread count for a user
+async function getUnreadCount(userId: string): Promise<number> {
+    await connectDB();
+    return await Notification.countDocuments({
+        recipient: userId,
+        read: false
+    });
+}
+
 // GET handler for fetching notifications
-export async function GET(req: NextRequest) {
+export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions);
-        if (!session) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        if (!session?.user) {
+            return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+                status: 401,
+                headers: { 'Content-Type': 'application/json' }
+            });
         }
 
         await connectDB();
-
         const userId = session.user.id;
-        const unread = req.nextUrl.searchParams.get('unread');
-        const limit = parseInt(req.nextUrl.searchParams.get('limit') || '10');
 
-        let query: any = { recipient: userId };
-        if (unread === 'true') {
-            query.read = false;
-        }
-
-        const notifications = await Notification.find(query)
+        // Get notifications for the current user
+        const notifications = await Notification.find({ recipient: userId })
             .sort({ createdAt: -1 })
-            .limit(limit)
+            .limit(50)
             .populate('sender', 'name profilePicture')
             .lean();
 
-        const unreadCount = await Notification.countDocuments({
-            recipient: userId,
-            read: false
-        });
+        // Get unread count
+        const unreadCount = await getUnreadCount(userId);
 
-        return NextResponse.json({
+        return new Response(JSON.stringify({
             notifications,
             unreadCount
+        }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
         });
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error) {
+        console.error('Error fetching notifications:', error);
+        return new Response(JSON.stringify({
+            error: 'Failed to fetch notifications'
+        }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+        });
     }
 }
 
@@ -49,50 +61,77 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const session = await getServerSession(authOptions);
-        if (!session) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+        if (!session?.user) {
+            return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+                status: 401,
+                headers: { 'Content-Type': 'application/json' }
+            });
         }
 
         await connectDB();
-        const data = await req.json();
-        const { recipientId, title, message } = data;
+        const { title, message, recipientId } = await req.json();
 
         if (!recipientId || !title || !message) {
-            return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+            return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' }
+            });
         }
 
-        // Validate recipient exists
+        // IMPORTANT: Check if we have the recipient's email
+        // If not, we need to look it up from the recipientId
         const recipient = await SuperUser.findById(recipientId);
+
         if (!recipient) {
-            return NextResponse.json({ error: 'Recipient not found' }, { status: 404 });
+            return new Response(JSON.stringify({ error: 'Recipient not found' }), {
+                status: 404,
+                headers: { 'Content-Type': 'application/json' }
+            });
         }
 
-        const notification = await Notification.create({
-            recipient: recipientId,
-            sender: session.user.id,
+        // Create notification in database
+        const notification = new Notification({
             title,
             message,
-            read: false
-        });
-
-        // Populate the sender information for the real-time notification
-        const populatedNotification = await Notification.findById(notification._id)
-            .populate('sender', 'name profilePicture')
-            .lean();
-
-        // Get updated unread count for the recipient
-        const unreadCount = await Notification.countDocuments({
             recipient: recipientId,
+            sender: session.user.id,
             read: false
         });
 
-        // Send real-time notification via SSE
-        sendNotification(recipientId, populatedNotification);
-        updateUnreadCount(recipientId, unreadCount);
+        await notification.save();
 
-        return NextResponse.json({ notification: populatedNotification }, { status: 201 });
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        // Get sender details for the notification
+        const sender = await SuperUser.findById(session.user.id);
+
+        // Send real-time notification with sender details
+        const notificationWithSender = {
+            _id: notification._id,
+            title: notification.title,
+            message: notification.message,
+            sender: {
+                _id: sender?._id || session.user.id,
+                name: sender?.name || 'Unknown',
+                profilePicture: sender?.profilePicture,
+            },
+            createdAt: notification.createdAt,
+            read: false,
+        };
+
+        // Use recipient email instead of ID for SSE connections
+        await sendNotification(recipient.email, notificationWithSender);
+        await updateUnreadCount(recipient.email, await getUnreadCount(recipientId));
+
+        return new Response(JSON.stringify({ success: true }), {
+            status: 201,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    } catch (error) {
+        console.error('Error sending notification:', error);
+        return new Response(JSON.stringify({ error: 'Failed to send notification' }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+        });
     }
 }
 
@@ -100,53 +139,66 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
     try {
         const session = await getServerSession(authOptions);
-        if (!session) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        if (!session?.user) {
+            return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+                status: 401,
+                headers: { 'Content-Type': 'application/json' }
+            });
         }
 
         await connectDB();
         const data = await req.json();
-        const { notificationId, markAllRead } = data;
-
         const userId = session.user.id;
+        const userEmail = session.user.email;
 
-        if (markAllRead) {
-            // Mark all notifications as read
+        if (data.markAllRead) {
+            // Mark all as read
             await Notification.updateMany(
                 { recipient: userId, read: false },
                 { $set: { read: true } }
             );
 
-            // Emit updated count (0) via SSE
-            updateUnreadCount(userId, 0);
+            // Update unread count via SSE (should be 0)
+            await updateUnreadCount(userEmail, 0);
 
-            return NextResponse.json({ message: 'All notifications marked as read' });
-        } else if (notificationId) {
-            // Mark a specific notification as read
+            return new Response(JSON.stringify({ success: true }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        } else if (data.notificationId) {
+            // Mark single notification as read
             const notification = await Notification.findOneAndUpdate(
-                { _id: notificationId, recipient: userId },
+                { _id: data.notificationId, recipient: userId },
                 { $set: { read: true } },
                 { new: true }
-            ).populate('sender', 'name profilePicture');
+            );
 
             if (!notification) {
-                return NextResponse.json({ error: 'Notification not found' }, { status: 404 });
+                return new Response(JSON.stringify({ error: 'Notification not found' }), {
+                    status: 404,
+                    headers: { 'Content-Type': 'application/json' }
+                });
             }
 
-            // Get updated unread count
-            const unreadCount = await Notification.countDocuments({
-                recipient: userId,
-                read: false
-            });
-
             // Update unread count via SSE
-            updateUnreadCount(userId, unreadCount);
+            const unreadCount = await getUnreadCount(userId);
+            await updateUnreadCount(userEmail, unreadCount);
 
-            return NextResponse.json({ notification });
+            return new Response(JSON.stringify({ success: true }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            });
         } else {
-            return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
+            return new Response(JSON.stringify({ error: 'Invalid request' }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' }
+            });
         }
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error) {
+        console.error('Error updating notifications:', error);
+        return new Response(JSON.stringify({ error: 'Failed to update notifications' }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+        });
     }
 } 
