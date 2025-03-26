@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
     console.log(`SSE: New connection request from ${session.user.email} with ID ${connectionId}`);
 
     // Debug: Print all current connections before adding this one
-    const connections = getAllConnections();
+    const connections = await getAllConnections();
     console.log(`SSE: Current connections before adding new one: ${connections.userCount} users, ${connections.connectionCount} total connections`);
 
     // Stream setup
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
         start: async (controller) => {
             try {
                 // Register this connection when the stream starts
-                registerConnection(
+                await registerConnection(
                     session.user.email as string,
                     controller,
                     connectionId
@@ -99,7 +99,9 @@ export async function GET(req: NextRequest) {
                         unregisterConnection(
                             session.user.email as string,
                             connectionId
-                        );
+                        ).catch(err => {
+                            console.error(`SSE: Error unregistering connection on heartbeat failure:`, err);
+                        });
                     }
                 }, 30000);
             } catch (error) {
@@ -118,12 +120,15 @@ export async function GET(req: NextRequest) {
             }
 
             // Clean up this connection when the client disconnects
-            unregisterConnection(
-                session.user.email as string,
-                connectionId
-            );
-
-            console.log(`SSE: Connection closed for ${session.user.email} with ID ${connectionId}`);
+            try {
+                await unregisterConnection(
+                    session.user.email as string,
+                    connectionId
+                );
+                console.log(`SSE: Connection closed for ${session.user.email} with ID ${connectionId}`);
+            } catch (error) {
+                console.error(`SSE: Error unregistering connection on cancel:`, error);
+            }
         }
     });
 
