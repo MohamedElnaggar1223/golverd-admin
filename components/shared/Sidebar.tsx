@@ -71,7 +71,7 @@ export function AdminSidebar() {
                                 </Link>
                             </SidebarMenuItem>
                             <SidebarMenuItem>
-                                <Link prefetch={true} href="/orders">
+                                <Link prefetch={true} href="/orders-and-appointments">
                                     <SidebarMenuButton tooltip='Orders & Appointments' className='text-white hover:bg-transparent hover:text-white hover:cursor-pointer space-x-2 py-8 pl-6 rounded-none'>
                                         <Image src="/images/orders.svg" alt="Orders & Appointments" width={24} height={24} />
                                         <span className='text-lg font-inter font-medium'>O & A</span>

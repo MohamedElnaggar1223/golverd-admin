@@ -84,7 +84,10 @@ const OrderSchema = new Schema<IOrder>(
             of: ChargeItemSchema
         },
         clientEmail: String,
-        clientID: String,
+        clientID: {
+            type: String,
+            ref: 'User'
+        },
         clientName: String,
         clientPhoneNumber: String,
         deliveryDate: {
