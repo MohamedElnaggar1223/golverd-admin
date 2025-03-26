@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from "react";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { getOrders } from "@/lib/actions/order-actions";
 import { getVendors } from "@/lib/actions/vendor-actions";
 import { getProductsByIds } from "@/lib/actions/product-actions";
@@ -65,7 +65,7 @@ export function OrdersTab() {
     }, [orders]);
 
     // Fetch product details for all product IDs at once
-    const { data: productsMap = {} } = useSuspenseQuery({
+    const { data: productsMap = {} } = useQuery({
         queryKey: ['products', productIds],
         queryFn: async () => {
             if (productIds.length === 0) return {};
