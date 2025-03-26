@@ -8,21 +8,21 @@ import SuperUser from '@/models/SuperUser';
 /**
  * Gets all active connections for superusers and users
  */
-export function getAllConnections() {
+export async function getAllConnections() {
     return connectionStore.getAllConnections();
 }
 
 /**
  * Register a new SSE connection for a user or superuser
  */
-export function registerConnection(userId: string, controller: ReadableStreamDefaultController<Uint8Array>, connectionId: string): void {
+export async function registerConnection(userId: string, controller: ReadableStreamDefaultController<Uint8Array>, connectionId: string): Promise<void> {
     connectionStore.registerConnection(userId.toLowerCase(), controller, connectionId);
 }
 
 /**
  * Unregister a SSE connection
  */
-export function unregisterConnection(userId: string, connectionId: string): void {
+export async function unregisterConnection(userId: string, connectionId: string): Promise<void> {
     connectionStore.unregisterConnection(userId.toLowerCase(), connectionId);
 }
 
