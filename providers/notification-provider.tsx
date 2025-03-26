@@ -4,18 +4,19 @@ import React, { createContext, useContext, useState, useEffect, useRef, ReactNod
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
 
-type Notification = {
+// Define the type for a notification
+export interface Notification {
     _id: string;
     title: string;
     message: string;
+    read: boolean;
     sender: {
         _id: string;
         name: string;
         profilePicture?: string;
     };
     createdAt: string;
-    read: boolean;
-};
+}
 
 interface NotificationContextType {
     notifications: Notification[];
@@ -32,55 +33,71 @@ interface NotificationContextType {
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
+export function useNotifications() {
+    const context = useContext(NotificationContext);
+    if (!context) {
+        throw new Error('useNotifications must be used within a NotificationProvider');
+    }
+    return context;
+}
+
 export default function NotificationProvider({ children }: { children: ReactNode }) {
     const { data: session, status } = useSession();
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [sseConnected, setSseConnected] = useState(false);
     const [connectionId, setConnectionId] = useState<string | null>(null);
     const [reconnectAttempts, setReconnectAttempts] = useState(0);
+    const [lastReconnectTime, setLastReconnectTime] = useState(0);
+
+    // Use refs to track the event source and reconnection attempts
     const eventSourceRef = useRef<EventSource | null>(null);
     const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Clear any existing timeouts when unmounting
-    useEffect(() => {
-        return () => {
-            if (reconnectTimeoutRef.current) {
-                clearTimeout(reconnectTimeoutRef.current);
-            }
-        };
-    }, []);
-
-    // Initialize SSE connection
-    useEffect(() => {
-        if (status === 'authenticated' && session?.user?.email) {
-            console.log('Authentication detected, connecting to SSE...');
-            connectSSE();
-            loadNotifications();
-
-            // Clean up on unmount
-            return () => {
-                console.log('Component unmounting, disconnecting SSE...');
-                disconnectSSE();
-            };
-        } else if (status === 'unauthenticated') {
-            console.log('User is not authenticated, no SSE connection');
-            disconnectSSE();
-        }
-    }, [status, session]);
-
-    const connectSSE = () => {
-        // Clean up existing connection first
-        disconnectSSE();
+    const loadNotifications = async () => {
+        if (!session?.user) return;
 
         try {
-            console.log('Creating new SSE connection...');
+            setLoading(true);
+            setError(null);
 
-            // Create new SSE connection with unique cache-busting parameter
-            const timestamp = new Date().getTime();
-            const sse = new EventSource(`/api/sse?t=${timestamp}`);
+            const response = await fetch('/api/notifications');
+            if (!response.ok) {
+                throw new Error('Failed to fetch notifications');
+            }
+
+            const data = await response.json();
+            setNotifications(data.notifications);
+
+            // Count unread notifications
+            const unreadCount = data.notifications.filter((n: Notification) => !n.read).length;
+            setUnreadCount(unreadCount);
+        } catch (err: any) {
+            console.error('Error loading notifications:', err);
+            setError(err.message || 'An error occurred');
+            toast.error('Failed to load notifications');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const connectSSE = () => {
+        // Clean up any existing connection first
+        if (eventSourceRef.current) {
+            eventSourceRef.current.close();
+            eventSourceRef.current = null;
+        }
+
+        if (!session?.user?.email || status !== 'authenticated') {
+            console.log('Cannot connect SSE: Not authenticated');
+            return;
+        }
+
+        try {
+            // Create a new SSE connection
+            const sse = new EventSource('/api/sse');
             eventSourceRef.current = sse;
 
             // Connection opened
@@ -88,8 +105,7 @@ export default function NotificationProvider({ children }: { children: ReactNode
                 console.log('SSE connection opened');
                 setSseConnected(true);
                 setError(null);
-                setReconnectAttempts(0);
-                toast.success('Connected to notification service', { id: 'sse-connection' });
+                setReconnectAttempts(0); // Reset reconnect attempts on successful connection
             };
 
             // Handle messages
@@ -98,41 +114,52 @@ export default function NotificationProvider({ children }: { children: ReactNode
                     const data = JSON.parse(event.data);
                     console.log('SSE message received:', data);
 
+                    // Handle different message types
                     switch (data.type) {
-                        case 'connection':
-                            setSseConnected(true);
-                            setConnectionId(data.connectionId);
+                        case 'connected':
                             console.log('SSE connected with ID:', data.connectionId);
+                            setConnectionId(data.connectionId);
+                            setSseConnected(true);
+                            setError(null);
                             break;
 
                         case 'notification':
                             // Add new notification to the list
-                            setNotifications(prev => [data.data, ...prev]);
+                            const newNotification = data.data;
+                            setNotifications(prev => [newNotification, ...prev]);
+
                             // Increment unread count
                             setUnreadCount(prev => prev + 1);
 
                             // Show toast notification
-                            toast.info(data.data.title, {
-                                description: data.data.message,
-                                action: {
-                                    label: 'View',
-                                    onClick: () => loadNotifications()
+                            // toast(
+                            //     <div>
+                            //         <p className="font-semibold">{newNotification.title}</p>
+                            //         <p className="text-sm">{newNotification.message}</p>
+                            //     </div>,
+                            //     {
+                            //         duration: 5000,
+                            //         position: 'top-right',
+                            //     }
+                            // );
+                            toast(newNotification.title, {
+                                description: newNotification.message,
+                                descriptionClassName: "description-class",
+                                classNames: {
+                                    title: "title-class",
+                                    description: "description-class"
                                 }
                             });
-
-                            // Show browser notification if allowed
-                            if ('Notification' in window && Notification.permission === 'granted') {
-                                const { title, message, sender } = data.data;
-                                new Notification(title, {
-                                    body: message,
-                                    icon: sender.profilePicture || '/favicon.ico',
-                                });
-                            }
                             break;
 
                         case 'unreadCount':
                             // Update unread count
                             setUnreadCount(data.data);
+                            break;
+
+                        case 'heartbeat':
+                            // Heartbeat received, connection still alive
+                            // console.log('SSE heartbeat received:', data.timestamp);
                             break;
 
                         default:
@@ -156,97 +183,83 @@ export default function NotificationProvider({ children }: { children: ReactNode
 
                 // Implement exponential backoff for reconnection
                 const maxAttempts = 10;
+                const now = Date.now();
+
+                // If it's been more than 2 minutes since last reconnect attempt, reset counter
+                if (now - lastReconnectTime > 120000) {
+                    setReconnectAttempts(0);
+                }
+
                 if (reconnectAttempts < maxAttempts) {
-                    const backoffTime = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
-                    console.log(`Reconnecting in ${backoffTime / 1000} seconds (attempt ${reconnectAttempts + 1}/${maxAttempts})`);
+                    const nextAttempt = Math.min(reconnectAttempts + 1, maxAttempts);
+                    setReconnectAttempts(nextAttempt);
+
+                    // Calculate backoff time: 2^attempt * 1000ms, capped at 30s
+                    const backoffTime = Math.min(Math.pow(2, nextAttempt) * 1000, 30000);
+
+                    console.log(`SSE: Will attempt reconnect in ${backoffTime / 1000}s (attempt ${nextAttempt}/${maxAttempts})`);
 
                     // Clear any existing timeout
                     if (reconnectTimeoutRef.current) {
                         clearTimeout(reconnectTimeoutRef.current);
                     }
 
-                    // Set new timeout
+                    // Set new timeout for reconnect
                     reconnectTimeoutRef.current = setTimeout(() => {
-                        setReconnectAttempts(prev => prev + 1);
+                        setLastReconnectTime(Date.now());
                         connectSSE();
                     }, backoffTime);
                 } else {
-                    console.error('Maximum reconnection attempts reached');
-                    toast.error('Failed to reconnect to notification service', {
-                        description: 'Please refresh the page',
-                        id: 'sse-reconnect-failure',
-                        action: {
-                            label: 'Retry',
-                            onClick: () => {
-                                setReconnectAttempts(0);
-                                connectSSE();
-                            }
-                        }
-                    });
+                    console.log('SSE: Max reconnect attempts reached. Manual reconnect required.');
+                    setError('Connection lost. Please reconnect manually.');
                 }
             };
-
-        } catch (err) {
-            console.error('Failed to initialize SSE:', err);
+        } catch (err: any) {
+            console.error('Error setting up SSE connection:', err);
+            setError(err.message || 'Failed to connect to notification service');
             setSseConnected(false);
-            setConnectionId(null);
-            setError('Failed to connect to notification service');
-            toast.error('Failed to connect to notification service', { id: 'sse-init-error' });
-        }
-    };
-
-    const disconnectSSE = () => {
-        // Clear any pending reconnect timeout
-        if (reconnectTimeoutRef.current) {
-            clearTimeout(reconnectTimeoutRef.current);
-            reconnectTimeoutRef.current = null;
-        }
-
-        // Close the EventSource if it exists
-        if (eventSourceRef.current) {
-            console.log('Closing existing SSE connection...');
-            eventSourceRef.current.close();
-            eventSourceRef.current = null;
-            setSseConnected(false);
-            setConnectionId(null);
         }
     };
 
     const reconnectSSE = () => {
-        toast.info('Reconnecting to notification service...', { id: 'sse-reconnect' });
-        disconnectSSE();
+        // Reset reconnect state
         setReconnectAttempts(0);
+        setLastReconnectTime(Date.now());
+
+        // Attempt to reconnect
         connectSSE();
     };
 
-    // Request notification permissions
+    // Effect to load notifications when session changes
     useEffect(() => {
-        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
-            Notification.requestPermission();
+        if (session?.user) {
+            loadNotifications();
+        } else {
+            // Reset state if user is not authenticated
+            setNotifications([]);
+            setUnreadCount(0);
         }
-    }, []);
+    }, [session]);
 
-    const loadNotifications = async () => {
-        setLoading(true);
-        setError(null);
+    // Effect to connect to SSE when session is available
+    useEffect(() => {
+        if (session?.user && status === 'authenticated') {
+            connectSSE();
+        }
 
-        try {
-            const response = await fetch('/api/notifications');
-            if (!response.ok) {
-                throw new Error('Failed to fetch notifications');
+        // Cleanup function
+        return () => {
+            if (eventSourceRef.current) {
+                eventSourceRef.current.close();
+                eventSourceRef.current = null;
             }
 
-            const data = await response.json();
-            setNotifications(data.notifications);
-            setUnreadCount(data.unreadCount);
-        } catch (err: any) {
-            setError(err.message || 'An error occurred');
-            console.error('Error loading notifications:', err);
-            toast.error('Failed to load notifications');
-        } finally {
-            setLoading(false);
-        }
-    };
+            if (reconnectTimeoutRef.current) {
+                clearTimeout(reconnectTimeoutRef.current);
+                reconnectTimeoutRef.current = null;
+            }
+        };
+    }, [session, status]);
 
     const markAsRead = async (notificationId: string) => {
         try {
@@ -262,7 +275,7 @@ export default function NotificationProvider({ children }: { children: ReactNode
                 throw new Error('Failed to mark notification as read');
             }
 
-            // Update local state (server will send updated count via SSE)
+            // Update local state
             setNotifications(prevNotifications =>
                 prevNotifications.map(notification =>
                     notification._id === notificationId
@@ -270,6 +283,9 @@ export default function NotificationProvider({ children }: { children: ReactNode
                         : notification
                 )
             );
+
+            // Decrement unread count (server will also send updated count via SSE)
+            setUnreadCount(prev => Math.max(0, prev - 1));
         } catch (err: any) {
             setError(err.message || 'An error occurred');
             console.error('Error marking notification as read:', err);
@@ -295,6 +311,9 @@ export default function NotificationProvider({ children }: { children: ReactNode
             setNotifications(prevNotifications =>
                 prevNotifications.map(notification => ({ ...notification, read: true }))
             );
+
+            // Set unread count to 0
+            setUnreadCount(0);
         } catch (err: any) {
             setError(err.message || 'An error occurred');
             console.error('Error marking all notifications as read:', err);
@@ -320,12 +339,4 @@ export default function NotificationProvider({ children }: { children: ReactNode
             {children}
         </NotificationContext.Provider>
     );
-}
-
-export function useNotifications() {
-    const context = useContext(NotificationContext);
-    if (context === undefined) {
-        throw new Error('useNotifications must be used within a NotificationProvider');
-    }
-    return context;
 } 

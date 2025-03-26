@@ -1,121 +1,37 @@
 'use server';
 
-import { v4 as uuidv4 } from 'uuid';
-import { cache } from 'react';
+import { connectDB } from '@/lib/mongoose';
+import Notification from '@/models/Notification';
+import { ConnectionStore } from '@/lib/connection-store';
+import SuperUser from '@/models/SuperUser';
 
-// Define types at module level so they're accessible everywhere
-type Controller = ReadableStreamDefaultController<Uint8Array>;
-type ConnectionInfo = {
-    id: string;
-    controller: Controller;
-    createdAt: Date;
-};
-
-// Create a persistent singleton for connection state
-// Using a closure to keep state isolated between module reloads
-const createConnectionStore = () => {
-    // Global map to store active user connections
-    const userConnections = new Map<string, Map<string, ConnectionInfo>>();
-
-    return {
-        getUserConnections: () => userConnections,
-        getConnectionCount: () => {
-            let count = 0;
-            userConnections.forEach(connections => {
-                count += connections.size;
-            });
-            return count;
-        }
-    };
-};
-
-// Create singleton store
-const connectionStore = createConnectionStore();
+// Create our connection storage - in-memory singleton
+// This manages all active SSE connections
+const connectionStore = new ConnectionStore();
 
 /**
- * Debug function to log all active connections
+ * Gets all active connections for superusers and users
  */
-function logAllConnections() {
-    const userConnections = connectionStore.getUserConnections();
-    console.log('=== SSE CONNECTION DEBUG ===');
-    console.log(`Total users connected: ${userConnections.size}`);
-    console.log(`Total active connections: ${connectionStore.getConnectionCount()}`);
-
-    userConnections.forEach((connections, userId) => {
-        console.log(`User ${userId}: ${connections.size} connections`);
-        connections.forEach((info, connId) => {
-            console.log(`  - Connection ${connId.substring(0, 8)}... created at ${info.createdAt.toISOString()}`);
-        });
-    });
-    console.log('=== END CONNECTION DEBUG ===');
+export async function getAllConnections() {
+    return connectionStore.getAllConnections();
 }
 
 /**
- * Registers a new SSE connection for a user and returns the connection ID
+ * Register a new SSE connection for a user or superuser
  */
-export async function registerConnection(userId: string, controller: Controller): Promise<string> {
-    const userConnections = connectionStore.getUserConnections();
-
-    // Convert userId to lowercase for case-insensitive matching
-    const normalizedUserId = userId.toLowerCase();
-
-    // Initialize user's connection map if needed
-    if (!userConnections.has(normalizedUserId)) {
-        userConnections.set(normalizedUserId, new Map());
-    }
-
-    // Generate a unique connection ID
-    const connectionId = uuidv4();
-    const connectionInfo: ConnectionInfo = {
-        id: connectionId,
-        controller,
-        createdAt: new Date()
-    };
-
-    // Add to user's connections
-    userConnections.get(normalizedUserId)?.set(connectionId, connectionInfo);
-
-    const activeConnections = userConnections.get(normalizedUserId)?.size || 0;
-    console.log(`SSE: User ${normalizedUserId} connected (${activeConnections} active connections)`);
-
-    // Log all connections for debugging
-    logAllConnections();
-
-    return connectionId;
+export async function registerConnection(userId: string, controller: ReadableStreamDefaultController, connectionId: string) {
+    connectionStore.registerConnection(userId.toLowerCase(), controller, connectionId);
 }
 
 /**
- * Unregisters an SSE connection for a user
+ * Unregister a SSE connection
  */
-export async function unregisterConnection(userId: string, connectionId: string): Promise<void> {
-    const userConnections = connectionStore.getUserConnections();
-
-    // Convert userId to lowercase for case-insensitive matching
-    const normalizedUserId = userId.toLowerCase();
-
-    const userConnectionMap = userConnections.get(normalizedUserId);
-    if (!userConnectionMap) {
-        console.log(`SSE: No connections found for user ${normalizedUserId} when trying to unregister`);
-        return;
-    }
-
-    // Remove this specific connection
-    userConnectionMap.delete(connectionId);
-
-    // Clean up user entry if no more connections
-    if (userConnectionMap.size === 0) {
-        userConnections.delete(normalizedUserId);
-        console.log(`SSE: User ${normalizedUserId} - all connections closed`);
-    } else {
-        console.log(`SSE: User ${normalizedUserId} - connection ${connectionId.substring(0, 8)}... closed (${userConnectionMap.size} connections remaining)`);
-    }
-
-    // Log all connections for debugging
-    logAllConnections();
+export async function unregisterConnection(userId: string, connectionId: string) {
+    connectionStore.unregisterConnection(userId.toLowerCase(), connectionId);
 }
 
 /**
- * Gets number of active connections for a user
+ * Gets number of active connections for a user 
  */
 export async function getConnectionCount(userId: string): Promise<number> {
     const userConnections = connectionStore.getUserConnections();
@@ -126,9 +42,22 @@ export async function getConnectionCount(userId: string): Promise<number> {
 }
 
 /**
- * Sends a notification to a specific user through all their SSE connections
+ * Send a notification to a user through their SSE connection
+ * Also saves notification to database if saveToDb is true
  */
-export async function sendNotification(userId: string, notification: any): Promise<boolean> {
+export async function sendNotification(
+    userId: string,
+    notificationData: {
+        title: string;
+        message: string;
+        sender: {
+            _id: string;
+            name: string;
+        };
+        createdAt: string;
+        read: boolean;
+    }
+): Promise<boolean> {
     const userConnections = connectionStore.getUserConnections();
 
     // Convert userId to lowercase for case-insensitive matching
@@ -136,44 +65,45 @@ export async function sendNotification(userId: string, notification: any): Promi
 
     const userConnectionMap = userConnections.get(normalizedUserId);
     if (!userConnectionMap || userConnectionMap.size === 0) {
-        console.log(`SSE: No active connections for user ${normalizedUserId}`);
-        logAllConnections();
-        return false;
+        console.log(`SSE: No active connections for user ${normalizedUserId} when sending notification`);
+        // We'll still create DB record if needed even if user isn't connected
     }
 
-    const data = JSON.stringify({
-        type: 'notification',
-        data: notification
-    });
+    // If user is connected, send notification via SSE
+    if (userConnectionMap && userConnectionMap.size > 0) {
+        const data = JSON.stringify({
+            type: 'notification',
+            data: notificationData
+        });
 
-    const encodedData = new TextEncoder().encode(`data: ${data}\n\n`);
-    let successCount = 0;
-    let failedConnections = [];
+        const encodedData = new TextEncoder().encode(`data: ${data}\n\n`);
+        let successCount = 0;
+        let failedConnections = [];
 
-    // Send to all connections for this user
-    for (const [connId, connectionInfo] of userConnectionMap.entries()) {
-        try {
-            connectionInfo.controller.enqueue(encodedData);
-            successCount++;
-        } catch (error) {
-            console.error(`SSE: Error sending to user ${normalizedUserId} connection ${connectionInfo.id.substring(0, 8)}...:`, error);
-            // Track failed connections for removal
-            failedConnections.push(connId);
+        // Send to all connections for this user
+        for (const [connId, connectionInfo] of userConnectionMap.entries()) {
+            try {
+                connectionInfo.controller.enqueue(encodedData);
+                successCount++;
+            } catch (error) {
+                console.error(`SSE: Error sending notification to user ${normalizedUserId} connection ${connectionInfo.id.substring(0, 8)}...:`, error);
+                // Track failed connections for removal
+                failedConnections.push(connId);
+            }
         }
-    }
 
-    // Remove failed connections
-    for (const connId of failedConnections) {
-        userConnectionMap.delete(connId);
-    }
+        // Remove failed connections
+        for (const connId of failedConnections) {
+            userConnectionMap.delete(connId);
+        }
 
-    if (successCount > 0) {
-        console.log(`SSE: Notification sent to ${successCount}/${userConnectionMap.size} connections for user ${normalizedUserId}`);
-        return true;
-    } else if (failedConnections.length > 0) {
-        // If all connections failed, clean up
-        if (userConnectionMap.size === 0) {
-            userConnections.delete(normalizedUserId);
+        if (successCount > 0) {
+            return true;
+        } else if (failedConnections.length > 0) {
+            // If all connections failed, clean up
+            if (userConnectionMap.size === 0) {
+                userConnections.delete(normalizedUserId);
+            }
         }
     }
 
@@ -231,4 +161,126 @@ export async function updateUnreadCount(userId: string, count: number): Promise<
     }
 
     return false;
+}
+
+/**
+ * Create a notification for a superuser
+ */
+export async function createSuperUserNotification(data: {
+    recipientId: string,
+    senderId: string,
+    title: string,
+    message: string
+}): Promise<boolean> {
+    try {
+        await connectDB();
+
+        const notification = new Notification({
+            recipient: data.recipientId,
+            recipientType: 'superuser',
+            sender: data.senderId,
+            senderType: 'superuser',
+            title: data.title,
+            message: data.message,
+            read: false
+        });
+
+        await notification.save();
+
+        // Get recipient for SSE notification
+        const recipient = await SuperUser.findById(data.recipientId, 'email');
+        if (recipient?.email) {
+            await sendNotification(recipient.email, {
+                title: data.title,
+                message: data.message,
+                sender: {
+                    _id: data.senderId,
+                    name: 'Admin', // Default name if sender details not provided
+                },
+                createdAt: new Date().toISOString(),
+                read: false,
+            });
+
+            // Update unread count
+            const count = await Notification.countDocuments({
+                recipient: data.recipientId,
+                recipientType: 'superuser',
+                read: false
+            });
+            await updateUnreadCount(recipient.email, count);
+        }
+
+        return true;
+    } catch (error) {
+        console.error('Error creating superuser notification:', error);
+        return false;
+    }
+}
+
+/**
+ * Gets notifications for a superuser
+ */
+export async function getSuperUserNotifications(superUserId: string) {
+    await connectDB();
+
+    const notifications = await Notification.find({
+        recipient: superUserId,
+        recipientType: 'superuser'
+    })
+        .sort({ createdAt: -1 })
+        .lean();
+
+    return notifications;
+}
+
+/**
+ * Gets unread notification count for a superuser
+ */
+export async function getSuperUserUnreadCount(superUserId: string) {
+    await connectDB();
+
+    const count = await Notification.countDocuments({
+        recipient: superUserId,
+        recipientType: 'superuser',
+        read: false
+    });
+
+    return { count };
+}
+
+/**
+ * Mark a superuser notification as read
+ */
+export async function markSuperUserNotificationAsRead(notificationId: string) {
+    await connectDB();
+
+    const notification = await Notification.findById(notificationId);
+    if (!notification) {
+        throw new Error('Notification not found');
+    }
+
+    if (notification.recipientType !== 'superuser') {
+        throw new Error('Not a superuser notification');
+    }
+
+    // Mark as read
+    notification.read = true;
+    await notification.save();
+
+    // Update unread count for real-time UI update
+    // Get superuser email to update unread count through SSE
+    const superUser = await SuperUser.findById(notification.recipient);
+    if (superUser?.email) {
+        // Get updated count
+        const count = await Notification.countDocuments({
+            recipient: notification.recipient,
+            recipientType: 'superuser',
+            read: false
+        });
+
+        // Send unread count update via SSE
+        await updateUnreadCount(superUser.email, count);
+    }
+
+    return { success: true };
 } 

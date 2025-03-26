@@ -1,4 +1,12 @@
 import mongoose from "mongoose";
+import '../models/User'
+import '../models/Vendor'
+import '../models/Order'
+import '../models/Notification'
+import '../models/Position'
+import '../models/SuperUser'
+import '../models/Product'
+import '../models/Appointment'
 
 let isConnected = false
 

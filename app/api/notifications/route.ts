@@ -3,20 +3,22 @@ import { connectDB } from '@/lib/mongoose';
 import Notification from '@/models/Notification';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import User from '@/models/User';
 import SuperUser from '@/models/SuperUser';
 import { sendNotification, updateUnreadCount } from '@/lib/actions/notifications-actions';
 
 // Helper function to get unread count for a user
-async function getUnreadCount(userId: string): Promise<number> {
+async function getUnreadCount(userId: string, recipientType: 'user' | 'superuser'): Promise<number> {
     await connectDB();
     return await Notification.countDocuments({
         recipient: userId,
+        recipientType,
         read: false
     });
 }
 
-// GET handler for fetching notifications
-export async function GET(req: Request) {
+// GET - Fetch notifications
+export async function GET(req: NextRequest) {
     try {
         const session = await getServerSession(authOptions);
         if (!session?.user) {
@@ -27,30 +29,70 @@ export async function GET(req: Request) {
         }
 
         await connectDB();
-        const userId = session.user.id;
 
-        // Get notifications for the current user
-        const notifications = await Notification.find({ recipient: userId })
+        // Check if user is a SuperUser or regular User
+        const email = session.user.email as string;
+        let userId: string;
+        let recipientType: 'user' | 'superuser';
+
+        // Check if user is a SuperUser
+        const superUser = await SuperUser.findOne({ email }).lean();
+        if (superUser) {
+            userId = superUser._id.toString();
+            recipientType = 'superuser';
+        } else {
+            // Try to find as regular User
+            const user = await User.findOne({ email }).lean();
+            if (!user) {
+                return new Response(JSON.stringify({ error: 'User not found' }), {
+                    status: 404,
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            }
+            userId = user._id.toString();
+            recipientType = 'user';
+        }
+
+        // Parse query parameters
+        const url = new URL(req.url);
+        const limit = parseInt(url.searchParams.get('limit') || '50');
+        const skip = parseInt(url.searchParams.get('skip') || '0');
+        const onlyUnread = url.searchParams.get('unread') === 'true';
+
+        // Build query
+        const query: any = {
+            recipient: userId,
+            recipientType
+        };
+
+        if (onlyUnread) {
+            query.read = false;
+        }
+
+        // Fetch notifications
+        const notifications = await Notification.find(query)
             .sort({ createdAt: -1 })
-            .limit(50)
-            .populate('sender', 'name profilePicture')
+            .skip(skip)
+            .limit(limit)
             .lean();
 
-        // Get unread count
-        const unreadCount = await getUnreadCount(userId);
+        // Get total count for pagination
+        const total = await Notification.countDocuments(query);
 
         return new Response(JSON.stringify({
             notifications,
-            unreadCount
+            pagination: {
+                total,
+                limit,
+                skip
+            }
         }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' }
         });
     } catch (error) {
         console.error('Error fetching notifications:', error);
-        return new Response(JSON.stringify({
-            error: 'Failed to fetch notifications'
-        }), {
+        return new Response(JSON.stringify({ error: 'Failed to fetch notifications' }), {
             status: 500,
             headers: { 'Content-Type': 'application/json' }
         });
@@ -95,7 +137,9 @@ export async function POST(req: NextRequest) {
             title,
             message,
             recipient: recipientId,
+            recipientType: 'superuser',
             sender: session.user.id,
+            senderType: 'superuser',
             read: false
         });
 
@@ -120,7 +164,7 @@ export async function POST(req: NextRequest) {
 
         // Use recipient email instead of ID for SSE connections
         await sendNotification(recipient.email, notificationWithSender);
-        await updateUnreadCount(recipient.email, await getUnreadCount(recipientId));
+        await updateUnreadCount(recipient.email, await getUnreadCount(recipientId, 'superuser'));
 
         return new Response(JSON.stringify({ success: true }), {
             status: 201,
@@ -135,7 +179,7 @@ export async function POST(req: NextRequest) {
     }
 }
 
-// PATCH handler for marking notifications as read
+// PATCH - Mark notification(s) as read
 export async function PATCH(req: NextRequest) {
     try {
         const session = await getServerSession(authOptions);
@@ -147,19 +191,42 @@ export async function PATCH(req: NextRequest) {
         }
 
         await connectDB();
+
+        // Check if user is a SuperUser or regular User
+        const email = session.user.email as string;
+        let userId: string;
+        let recipientType: 'user' | 'superuser';
+
+        // Check if user is a SuperUser
+        const superUser = await SuperUser.findOne({ email }).lean();
+        if (superUser) {
+            userId = superUser._id.toString();
+            recipientType = 'superuser';
+        } else {
+            // Try to find as regular User
+            const user = await User.findOne({ email }).lean();
+            if (!user) {
+                return new Response(JSON.stringify({ error: 'User not found' }), {
+                    status: 404,
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            }
+            userId = user._id.toString();
+            recipientType = 'user';
+        }
+
         const data = await req.json();
-        const userId = session.user.id;
-        const userEmail = session.user.email;
 
         if (data.markAllRead) {
-            // Mark all as read
+            // Mark all notifications as read
             await Notification.updateMany(
-                { recipient: userId, read: false },
+                { recipient: userId, recipientType, read: false },
                 { $set: { read: true } }
             );
 
-            // Update unread count via SSE (should be 0)
-            await updateUnreadCount(userEmail, 0);
+            // Update unread count via SSE
+            const unreadCount = await getUnreadCount(userId, recipientType);
+            await updateUnreadCount(email, unreadCount);
 
             return new Response(JSON.stringify({ success: true }), {
                 status: 200,
@@ -168,7 +235,7 @@ export async function PATCH(req: NextRequest) {
         } else if (data.notificationId) {
             // Mark single notification as read
             const notification = await Notification.findOneAndUpdate(
-                { _id: data.notificationId, recipient: userId },
+                { _id: data.notificationId, recipient: userId, recipientType },
                 { $set: { read: true } },
                 { new: true }
             );
@@ -181,8 +248,8 @@ export async function PATCH(req: NextRequest) {
             }
 
             // Update unread count via SSE
-            const unreadCount = await getUnreadCount(userId);
-            await updateUnreadCount(userEmail, unreadCount);
+            const unreadCount = await getUnreadCount(userId, recipientType);
+            await updateUnreadCount(email, unreadCount);
 
             return new Response(JSON.stringify({ success: true }), {
                 status: 200,

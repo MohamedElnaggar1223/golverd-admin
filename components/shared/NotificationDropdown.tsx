@@ -140,11 +140,11 @@ export default function NotificationDropdown() {
                         <div key={notification._id} className={`p-4 hover:bg-gray-50 transition-colors ${notification.read ? '' : 'bg-blue-50'}`}>
                             <div className="flex items-start gap-3">
                                 <Avatar className="h-10 w-10">
-                                    {notification.sender.profilePicture ? (
+                                    {notification.sender?.profilePicture ? (
                                         <AvatarImage src={notification.sender.profilePicture} alt={notification.sender.name} />
                                     ) : (
                                         <AvatarFallback>
-                                            {notification.sender.name.substring(0, 2).toUpperCase()}
+                                            {notification.sender?.name?.substring(0, 2).toUpperCase()}
                                         </AvatarFallback>
                                     )}
                                 </Avatar>

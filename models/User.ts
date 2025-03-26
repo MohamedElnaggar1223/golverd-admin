@@ -16,7 +16,10 @@ interface IAddress {
 export interface IUser extends Document {
     _id: string;
     addresses: Map<string, IAddress>;
-    createdAt: Date;
+    createdAt: {
+        _seconds: number;
+        _nanoseconds: number;
+    };
     defaultAddress?: string;
     email: string;
     firstName?: string;
@@ -55,8 +58,8 @@ const UserSchema = new Schema<IUser>(
             of: AddressSchema
         },
         createdAt: {
-            type: Date,
-            default: Date.now
+            _seconds: Number,
+            _nanoseconds: Number
         },
         defaultAddress: String,
         email: {

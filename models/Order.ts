@@ -26,11 +26,17 @@ export interface IOrder extends Document {
     clientID?: string;
     clientName?: string;
     clientPhoneNumber?: string;
-    deliveryDate?: Date;
+    deliveryDate?: {
+        _seconds: number;
+        _nanoseconds: number;
+    };
     id?: string;
     invoice?: number;
     items: Map<string, number>;
-    orderDate: Date;
+    orderDate: {
+        _seconds: number;
+        _nanoseconds: number;
+    };
     paymentMethod?: string;
     price?: number;
     promocode?: string;
@@ -81,7 +87,10 @@ const OrderSchema = new Schema<IOrder>(
         clientID: String,
         clientName: String,
         clientPhoneNumber: String,
-        deliveryDate: Date,
+        deliveryDate: {
+            _seconds: Number,
+            _nanoseconds: Number
+        },
         id: String,
         invoice: Number,
         items: {
@@ -89,8 +98,8 @@ const OrderSchema = new Schema<IOrder>(
             of: Number
         },
         orderDate: {
-            type: Date,
-            default: Date.now
+            _seconds: Number,
+            _nanoseconds: Number
         },
         paymentMethod: String,
         price: Number,
@@ -99,7 +108,10 @@ const OrderSchema = new Schema<IOrder>(
             type: String,
             default: 'pending'
         },
-        vendorID: String
+        vendorID: {
+            type: String,
+            ref: 'Vendor'
+        }
     },
     {
         timestamps: true,

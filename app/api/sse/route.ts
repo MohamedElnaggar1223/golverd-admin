@@ -1,88 +1,131 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { registerConnection, unregisterConnection } from '@/lib/actions/notifications-actions';
+import { v4 as uuidv4 } from 'uuid';
 
 // Define proper types for ReadableStream controller
 type Controller = ReadableStreamDefaultController<Uint8Array>;
 
 // Force this route to run on the server in a persistent environment
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 export const runtime = 'nodejs'; // Use Node.js runtime
 export const preferredRegion = 'auto';
 
 export async function GET(req: NextRequest) {
-    // Get user session
+    // Get current user from session
     const session = await getServerSession(authOptions);
-
-    // Check if user is authenticated
     if (!session?.user?.email) {
-        console.log('SSE: Unauthorized connection attempt');
-        return new NextResponse('Unauthorized', { status: 401 });
+        return new Response('Unauthorized', { status: 401 });
     }
 
-    // Get user identifier (email)
-    const userId = session.user.email;
-    console.log(`SSE: Connection request from user ${userId}`);
+    // Create a unique connection ID for this session
+    const connectionId = uuidv4();
 
-    // Connection ID will be set in the start method
-    let connectionId: string;
-    // Store heartbeat interval reference for cleanup
-    let heartbeatInterval: NodeJS.Timeout;
+    // Stream setup
+    const encoder = new TextEncoder();
 
-    // Create a stream for Server-Sent Events
+    // Store references for cleanup
+    let heartbeatInterval: NodeJS.Timeout | null = null;
+    let closed = false;
+
     const stream = new ReadableStream({
-        async start(controller) {
+        start: async (controller) => {
             try {
-                // Register this connection and get a connection ID
-                connectionId = await registerConnection(userId, controller);
-
-                // Send initial connection message
-                const data = JSON.stringify({
-                    type: 'connection',
-                    message: 'Connected to notifications',
+                // Register this connection when the stream starts
+                registerConnection(
+                    session.user.email as string,
+                    controller,
                     connectionId
-                });
-                controller.enqueue(new TextEncoder().encode(`data: ${data}\n\n`));
+                );
 
-                // Send heartbeat every 30 seconds to keep connection alive
+                console.log(`SSE: Connection established for ${session.user.email} with ID ${connectionId}`);
+
+                // Send initial heartbeat to confirm connection
+                const initialMessage = {
+                    type: 'connected',
+                    message: 'Connected to notification service',
+                    connectionId,
+                    timestamp: new Date().toISOString()
+                };
+
+                controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify(initialMessage)}\n\n`)
+                );
+
+                // Start heartbeat interval (every 30 seconds)
                 heartbeatInterval = setInterval(() => {
                     try {
-                        controller.enqueue(new TextEncoder().encode(`: heartbeat\n\n`));
+                        // Skip sending heartbeat if connection is already closed
+                        if (closed) {
+                            if (heartbeatInterval) {
+                                clearInterval(heartbeatInterval);
+                                heartbeatInterval = null;
+                            }
+                            return;
+                        }
+
+                        const heartbeat = {
+                            type: 'heartbeat',
+                            timestamp: new Date().toISOString()
+                        };
+
+                        controller.enqueue(
+                            encoder.encode(`data: ${JSON.stringify(heartbeat)}\n\n`)
+                        );
                     } catch (error) {
-                        console.error('SSE: Error sending heartbeat:', error);
-                        clearInterval(heartbeatInterval);
+                        // If we can't send heartbeat, connection may be closed
+                        console.error(`SSE: Heartbeat failed for ${session.user.email}:`, error);
+
+                        // Mark as closed to prevent further attempts
+                        closed = true;
+
+                        // Clean up on error
+                        if (heartbeatInterval) {
+                            clearInterval(heartbeatInterval);
+                            heartbeatInterval = null;
+                        }
+
+                        // Unregister the connection since it's no longer valid
+                        unregisterConnection(
+                            session.user.email as string,
+                            connectionId
+                        );
                     }
                 }, 30000);
-
             } catch (error) {
-                console.error('SSE: Error in start method:', error);
-                controller.error('Internal Server Error');
+                console.error(`SSE: Error during start for ${session.user.email}:`, error);
+                controller.error(error);
             }
         },
-        async cancel() {
-            try {
-                // Clear any heartbeat interval
-                if (heartbeatInterval) {
-                    clearInterval(heartbeatInterval);
-                }
+        cancel: async () => {
+            // Mark as closed
+            closed = true;
 
-                // Unregister this specific connection using its ID
-                await unregisterConnection(userId, connectionId);
-                console.log(`SSE: Connection ${connectionId} cancelled for user ${userId}`);
-            } catch (error) {
-                console.error('SSE: Error in cancel method:', error);
+            // Clean up interval on cancellation
+            if (heartbeatInterval) {
+                clearInterval(heartbeatInterval);
+                heartbeatInterval = null;
             }
+
+            // Clean up this connection when the client disconnects
+            unregisterConnection(
+                session.user.email as string,
+                connectionId
+            );
+
+            console.log(`SSE: Connection closed for ${session.user.email} with ID ${connectionId}`);
         }
     });
 
-    // Return the stream as an SSE response with appropriate headers
-    return new NextResponse(stream, {
+    // Return the stream as an SSE response
+    return new Response(stream, {
         headers: {
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache, no-transform',
             'Connection': 'keep-alive',
             'X-Accel-Buffering': 'no' // Disable buffering for Nginx
-        }
+        },
     });
 }
