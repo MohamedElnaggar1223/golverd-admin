@@ -10,16 +10,25 @@ export type ConnectionInfo = {
     createdAt: Date;
 };
 
+// Create a global variable to store the singleton instance
+// This ensures it's maintained across module reloads
+// @ts-ignore - Global declaration
+declare global {
+    var _connectionStoreInstance: ConnectionStore | undefined;
+}
+
 /**
  * Connection store to manage SSE connections
- * Implemented as a singleton to maintain state between module reloads
+ * Implemented as a proper singleton to maintain state between module reloads
  */
 export class ConnectionStore {
     private userConnections: Map<string, Map<string, ConnectionInfo>>;
 
     constructor() {
-        // Global map to store active user connections
+        // Global map to store active user connections - initialize only if not already present
+        // which ensures we don't reset the map on module reloads
         this.userConnections = new Map<string, Map<string, ConnectionInfo>>();
+        console.log('Connection store initialized');
     }
 
     /**
@@ -64,7 +73,10 @@ export class ConnectionStore {
         };
         this.userConnections.get(normalizedUserId)?.set(connectionId, connectionInfo);
 
+        // Debug log
         console.log(`SSE: User ${normalizedUserId} connected (${this.userConnections.get(normalizedUserId)?.size || 0} active connections)`);
+        this.logAllConnections();
+
         return connectionId;
     }
 
@@ -91,6 +103,9 @@ export class ConnectionStore {
         } else {
             console.log(`SSE: User ${normalizedUserId} - connection ${connectionId.substring(0, 8)}... closed (${userConnectionMap.size} connections remaining)`);
         }
+
+        // Debug log after unregistering
+        this.logAllConnections();
     }
 
     /**
@@ -114,4 +129,12 @@ export class ConnectionStore {
         });
         console.log('=== END CONNECTION DEBUG ===');
     }
-} 
+}
+
+// Create or reuse the singleton instance
+// In Next.js, module state is reset between requests in development,
+// but global variables persist
+export const connectionStore = global._connectionStoreInstance || new ConnectionStore();
+
+// Save the instance to the global object
+global._connectionStoreInstance = connectionStore; 

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { registerConnection, unregisterConnection } from '@/lib/actions/notifications-actions';
+import { registerConnection, unregisterConnection, getAllConnections } from '@/lib/actions/notifications-actions';
 import { v4 as uuidv4 } from 'uuid';
 
 // Define proper types for ReadableStream controller
@@ -17,11 +17,19 @@ export async function GET(req: NextRequest) {
     // Get current user from session
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
+        console.error('SSE: Unauthorized connection attempt');
         return new Response('Unauthorized', { status: 401 });
     }
 
     // Create a unique connection ID for this session
     const connectionId = uuidv4();
+
+    // Log connection attempt
+    console.log(`SSE: New connection request from ${session.user.email} with ID ${connectionId}`);
+
+    // Debug: Print all current connections before adding this one
+    const connections = getAllConnections();
+    console.log(`SSE: Current connections before adding new one: ${connections.userCount} users, ${connections.connectionCount} total connections`);
 
     // Stream setup
     const encoder = new TextEncoder();

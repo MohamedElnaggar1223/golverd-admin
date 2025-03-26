@@ -2,36 +2,32 @@
 
 import { connectDB } from '@/lib/mongoose';
 import Notification from '@/models/Notification';
-import { ConnectionStore } from '@/lib/connection-store';
+import { connectionStore } from '@/lib/connection-store';
 import SuperUser from '@/models/SuperUser';
-
-// Create our connection storage - in-memory singleton
-// This manages all active SSE connections
-const connectionStore = new ConnectionStore();
 
 /**
  * Gets all active connections for superusers and users
  */
-export async function getAllConnections() {
+export function getAllConnections() {
     return connectionStore.getAllConnections();
 }
 
 /**
  * Register a new SSE connection for a user or superuser
  */
-export async function registerConnection(userId: string, controller: ReadableStreamDefaultController, connectionId: string) {
+export function registerConnection(userId: string, controller: ReadableStreamDefaultController<Uint8Array>, connectionId: string): void {
     connectionStore.registerConnection(userId.toLowerCase(), controller, connectionId);
 }
 
 /**
  * Unregister a SSE connection
  */
-export async function unregisterConnection(userId: string, connectionId: string) {
+export function unregisterConnection(userId: string, connectionId: string): void {
     connectionStore.unregisterConnection(userId.toLowerCase(), connectionId);
 }
 
 /**
- * Gets number of active connections for a user 
+ * Gets number of active connections for a user
  */
 export async function getConnectionCount(userId: string): Promise<number> {
     const userConnections = connectionStore.getUserConnections();
@@ -67,47 +63,50 @@ export async function sendNotification(
     if (!userConnectionMap || userConnectionMap.size === 0) {
         console.log(`SSE: No active connections for user ${normalizedUserId} when sending notification`);
         // We'll still create DB record if needed even if user isn't connected
+        return false;
     }
 
     // If user is connected, send notification via SSE
-    if (userConnectionMap && userConnectionMap.size > 0) {
-        const data = JSON.stringify({
-            type: 'notification',
-            data: notificationData
-        });
+    const data = JSON.stringify({
+        type: 'notification',
+        data: notificationData
+    });
 
-        const encodedData = new TextEncoder().encode(`data: ${data}\n\n`);
-        let successCount = 0;
-        let failedConnections = [];
+    const encodedData = new TextEncoder().encode(`data: ${data}\n\n`);
+    let successCount = 0;
+    let failedConnections = [];
 
-        // Send to all connections for this user
-        for (const [connId, connectionInfo] of userConnectionMap.entries()) {
-            try {
-                connectionInfo.controller.enqueue(encodedData);
-                successCount++;
-            } catch (error) {
-                console.error(`SSE: Error sending notification to user ${normalizedUserId} connection ${connectionInfo.id.substring(0, 8)}...:`, error);
-                // Track failed connections for removal
-                failedConnections.push(connId);
-            }
-        }
+    console.log(`SSE: Sending notification to user ${normalizedUserId} with ${userConnectionMap.size} active connections`);
 
-        // Remove failed connections
-        for (const connId of failedConnections) {
-            userConnectionMap.delete(connId);
-        }
-
-        if (successCount > 0) {
-            return true;
-        } else if (failedConnections.length > 0) {
-            // If all connections failed, clean up
-            if (userConnectionMap.size === 0) {
-                userConnections.delete(normalizedUserId);
-            }
+    // Send to all connections for this user
+    for (const [connId, connectionInfo] of userConnectionMap.entries()) {
+        try {
+            connectionInfo.controller.enqueue(encodedData);
+            successCount++;
+            console.log(`SSE: Successfully sent notification to ${normalizedUserId} connection ${connId.substring(0, 8)}`);
+        } catch (error) {
+            console.error(`SSE: Error sending notification to user ${normalizedUserId} connection ${connectionInfo.id.substring(0, 8)}...:`, error);
+            // Track failed connections for removal
+            failedConnections.push(connId);
         }
     }
 
-    return false;
+    // Remove failed connections
+    for (const connId of failedConnections) {
+        userConnectionMap.delete(connId);
+    }
+
+    if (successCount > 0) {
+        console.log(`SSE: Successfully delivered notification to ${successCount}/${userConnectionMap.size} connections for user ${normalizedUserId}`);
+        return true;
+    } else if (failedConnections.length > 0) {
+        // If all connections failed, clean up
+        if (userConnectionMap.size === 0) {
+            userConnections.delete(normalizedUserId);
+        }
+    }
+
+    return successCount > 0;
 }
 
 /**
@@ -134,6 +133,8 @@ export async function updateUnreadCount(userId: string, count: number): Promise<
     let successCount = 0;
     let failedConnections = [];
 
+    console.log(`SSE: Updating unread count for user ${normalizedUserId} to ${count} on ${userConnectionMap.size} connections`);
+
     // Send to all connections for this user
     for (const [connId, connectionInfo] of userConnectionMap.entries()) {
         try {
@@ -152,6 +153,7 @@ export async function updateUnreadCount(userId: string, count: number): Promise<
     }
 
     if (successCount > 0) {
+        console.log(`SSE: Successfully updated unread count for ${successCount}/${userConnectionMap.size} connections`);
         return true;
     } else if (failedConnections.length > 0) {
         // If all connections failed, clean up
@@ -160,7 +162,7 @@ export async function updateUnreadCount(userId: string, count: number): Promise<
         }
     }
 
-    return false;
+    return successCount > 0;
 }
 
 /**
