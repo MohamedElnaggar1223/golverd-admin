@@ -25,6 +25,7 @@ import { Search, ShoppingBag } from 'lucide-react';
 import { IOrder } from '@/models/Order';
 import { useDebounce } from '@/lib/hooks/use-debounce';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { getQueryClient } from '@/lib/get-query-client';
 
 interface UserOrdersProps {
     selectedUserId: string | null;
@@ -49,13 +50,17 @@ interface OrderItem {
 }
 
 export default function UserOrders({ selectedUserId }: UserOrdersProps) {
+    const queryClient = getQueryClient()
+
     const [searchQuery, setSearchQuery] = useState('');
     const debouncedSearch = useDebounce(searchQuery, 300);
+
+    const allOrders = queryClient.getQueryData<LeanOrder[]>(['orders'])
 
     // Fetch orders
     const ordersQuery = useQuery({
         queryKey: ['orders', selectedUserId],
-        queryFn: () => selectedUserId ? getUserOrders(selectedUserId) : Promise.resolve([]),
+        queryFn: () => selectedUserId ? allOrders?.length ? allOrders.filter(order => order.clientID === selectedUserId) : getUserOrders(selectedUserId) : Promise.resolve([]),
         enabled: !!selectedUserId,
     });
 
