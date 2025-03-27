@@ -55,12 +55,10 @@ export default function UserOrders({ selectedUserId }: UserOrdersProps) {
     const [searchQuery, setSearchQuery] = useState('');
     const debouncedSearch = useDebounce(searchQuery, 300);
 
-    const allOrders = queryClient.getQueryData<LeanOrder[]>(['orders'])
-
     // Fetch orders
     const ordersQuery = useQuery({
         queryKey: ['orders', selectedUserId],
-        queryFn: () => selectedUserId ? allOrders?.length ? allOrders.filter(order => order.clientID === selectedUserId) : getUserOrders(selectedUserId) : Promise.resolve([]),
+        queryFn: () => selectedUserId ? getUserOrders(selectedUserId) : Promise.resolve([]),
         enabled: !!selectedUserId,
     });
 
