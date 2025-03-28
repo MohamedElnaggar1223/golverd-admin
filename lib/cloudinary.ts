@@ -8,8 +8,9 @@ cloudinary.config({
 
 export async function uploadImage(file: Buffer, folder: string = 'team-members'): Promise<string> {
     return new Promise((resolve, reject) => {
-        // Convert Buffer to base64
-        const base64Image = `data:image/jpeg;base64,${file.toString('base64')}`;
+        // Convert Buffer to base64 string properly
+        const base64String = file.toString('base64');
+        const base64Image = `data:image/jpeg;base64,${base64String}`;
 
         cloudinary.uploader.upload(
             base64Image,

@@ -1,3 +1,5 @@
+'use client'
+
 import {
     Sidebar,
     SidebarContent,
@@ -13,8 +15,21 @@ import {
 import Image from "next/image"
 import SignOutButton from "../auth/SignOutButton"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { useState, useEffect } from "react"
+import { ChevronDown, ChevronUp } from "lucide-react"
 
 export function AdminSidebar() {
+    const pathname = usePathname();
+    const [vendorsOpen, setVendorsOpen] = useState(false);
+
+    // Auto-open vendors submenu when on vendors pages
+    useEffect(() => {
+        if (pathname?.startsWith('/vendors')) {
+            setVendorsOpen(true);
+        }
+    }, [pathname]);
+
     return (
         <Sidebar collapsible="icon">
             <SidebarHeader className='pt-6'>
@@ -63,12 +78,38 @@ export function AdminSidebar() {
                                 </Link>
                             </SidebarMenuItem>
                             <SidebarMenuItem>
-                                <Link prefetch={true} href="/vendors">
-                                    <SidebarMenuButton tooltip='Vendors' className='text-white hover:bg-transparent hover:text-white hover:cursor-pointer space-x-2 py-8 pl-6 rounded-none'>
+                                <div>
+                                    <button
+                                        onClick={() => setVendorsOpen(!vendorsOpen)}
+                                        className='flex items-center text-white hover:bg-transparent hover:text-white hover:cursor-pointer space-x-2 py-8 pl-6 rounded-none w-full'
+                                    >
                                         <Image src="/images/vendors.svg" alt="Vendors" width={24} height={24} />
                                         <span className='text-lg font-inter font-medium'>Vendors</span>
-                                    </SidebarMenuButton>
-                                </Link>
+                                        {vendorsOpen ? (
+                                            <ChevronUp className="ml-auto h-4 w-4 shrink-0 text-white opacity-50 mr-4" />
+                                        ) : (
+                                            <ChevronDown className="ml-auto h-4 w-4 shrink-0 text-white opacity-50 mr-4" />
+                                        )}
+                                    </button>
+                                    {vendorsOpen && (
+                                        <div className="bg-[#44312D]">
+                                            <SidebarMenuItem>
+                                                <Link prefetch={true} href="/vendors/requests">
+                                                    <SidebarMenuButton tooltip='Requests' className='text-white hover:bg-transparent hover:text-white hover:cursor-pointer space-x-2 py-5 pl-14 rounded-none'>
+                                                        <span className='text-base font-inter font-medium'>Requests</span>
+                                                    </SidebarMenuButton>
+                                                </Link>
+                                            </SidebarMenuItem>
+                                            <SidebarMenuItem>
+                                                <Link prefetch={true} href="/vendors/accounts">
+                                                    <SidebarMenuButton tooltip='Accounts' className='text-white hover:bg-transparent hover:text-white hover:cursor-pointer space-x-2 py-5 pl-14 rounded-none'>
+                                                        <span className='text-base font-inter font-medium'>Accounts</span>
+                                                    </SidebarMenuButton>
+                                                </Link>
+                                            </SidebarMenuItem>
+                                        </div>
+                                    )}
+                                </div>
                             </SidebarMenuItem>
                             <SidebarMenuItem>
                                 <Link prefetch={true} href="/orders-and-appointments">

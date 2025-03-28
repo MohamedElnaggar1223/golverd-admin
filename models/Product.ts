@@ -23,7 +23,10 @@ export interface IProduct {
     diamondQuantity?: any;
     diamondShapes?: any;
     docID?: string;
-    exactDate?: Date;
+    exactDate?: {
+        _seconds: number;
+        _nanoseconds: number;
+    };
     frontProduct: boolean;
     gender?: string;
     goldColor?: any;
@@ -99,7 +102,10 @@ const ProductSchema = new Schema<IProduct>(
         diamondQuantity: Schema.Types.Mixed,
         diamondShapes: Schema.Types.Mixed,
         docID: String,
-        exactDate: Date,
+        exactDate: {
+            _seconds: Number,
+            _nanoseconds: Number
+        },
         frontProduct: {
             type: Boolean,
             default: false

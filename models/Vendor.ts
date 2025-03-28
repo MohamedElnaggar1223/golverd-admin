@@ -38,6 +38,10 @@ export interface IVendor extends Document {
     views?: any;
     createdAt: Date;
     updatedAt: Date;
+    rent?: number;
+    commission?: number;
+    activationDate?: Date;
+    email?: string;
 }
 
 interface IVendorModel extends Model<IVendor> { }
@@ -108,7 +112,17 @@ const VendorSchema = new Schema<IVendor>(
             type: String,
             default: 'pending'
         },
-        views: Schema.Types.Mixed
+        views: Schema.Types.Mixed,
+        rent: {
+            type: Number,
+            default: 0
+        },
+        commission: {
+            type: Number,
+            default: 0
+        },
+        activationDate: Date,
+        email: String
     },
     {
         timestamps: true,

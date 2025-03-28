@@ -2,6 +2,8 @@
 
 import { connectDB } from '@/lib/mongoose';
 import Product from '@/models/Product';
+import { uploadImage, deleteImage } from '@/lib/cloudinary';
+import { getSession } from '@/lib/auth';
 
 /**
  * Get product by ID
@@ -76,4 +78,107 @@ export async function getProductsByVendorId(vendorId: string) {
         .lean();
 
     return products;
+}
+
+/**
+ * Upload a product image using Cloudinary
+ */
+export async function uploadProductImage(productId: string, file: Buffer) {
+    try {
+        await connectDB();
+
+        // Authentication check
+        const session = await getSession();
+        if (!session?.user) {
+            throw new Error('Not authenticated');
+        }
+
+        // Upload image to Cloudinary
+        const imageUrl = await uploadImage(file, 'products');
+
+        // Update product with new image
+        const product = await Product.findById(productId);
+
+        if (!product) {
+            throw new Error('Product not found');
+        }
+
+        if (!product.images) {
+            product.images = [];
+        }
+
+        product.images.push(imageUrl);
+        await product.save();
+
+        return { success: true, imageUrl };
+    } catch (error) {
+        console.error('Error uploading product image:', error);
+        throw error;
+    }
+}
+
+/**
+ * Delete a product image
+ */
+export async function deleteProductImage(productId: string, imageUrl: string) {
+    try {
+        await connectDB();
+
+        // Authentication check
+        const session = await getSession();
+        if (!session?.user) {
+            throw new Error('Not authenticated');
+        }
+
+        // Find the product
+        const product = await Product.findById(productId);
+
+        if (!product) {
+            throw new Error('Product not found');
+        }
+
+        // Remove image from Cloudinary
+        await deleteImage(imageUrl);
+
+        // Remove image from product
+        if (product.images && product.images.length) {
+            product.images = product.images.filter(img => img !== imageUrl);
+            await product.save();
+        }
+
+        return { success: true };
+    } catch (error) {
+        console.error('Error deleting product image:', error);
+        throw error;
+    }
+}
+
+/**
+ * Update product information
+ */
+export async function updateProduct(productId: string, data: any) {
+    try {
+        await connectDB();
+
+        // Authentication check
+        const session = await getSession();
+        if (!session?.user) {
+            throw new Error('Not authenticated');
+        }
+
+        const product = await Product.findByIdAndUpdate(
+            productId,
+            { ...data },
+            { new: true }
+        );
+
+        if (!product) {
+            throw new Error('Product not found');
+        }
+
+        return { success: true, message: 'Product updated successfully' };
+    } catch (error) {
+        console.error('Error updating product:', error);
+        throw error;
+    }
 } 
