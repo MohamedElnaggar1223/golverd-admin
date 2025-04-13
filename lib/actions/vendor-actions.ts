@@ -26,26 +26,19 @@ export async function getVendors() {
     }
 }
 
-export async function getVendorById(id: string) {
+export async function getVendorById(vendorId: string) {
     try {
         await connectDB();
 
-        // Authentication check
-        const session = await getSession();
-        if (!session?.user) {
-            throw new Error('Not authenticated');
-        }
-
-        const vendor = await Vendor.findById(id).lean();
-
+        const vendor = await Vendor.findById(vendorId).lean();
         if (!vendor) {
-            throw new Error('Vendor not found');
+            throw new Error("Vendor not found");
         }
 
         return vendor;
     } catch (error) {
-        console.error('Error fetching vendor:', error);
-        throw error;
+        console.error(`Error fetching vendor ${vendorId}:`, error);
+        throw new Error("Failed to fetch vendor");
     }
 }
 
@@ -62,7 +55,7 @@ export async function approveVendor(id: string, data: { rent: number, commission
         const vendor = await Vendor.findByIdAndUpdate(
             id,
             {
-                status: 'accepted',
+                status: 'approved',
                 rent: data.rent,
                 commission: data.commission,
                 activationDate: data.activationDate
@@ -126,7 +119,7 @@ export async function freezeVendorAccount(id: string) {
                         status: {
                             $cond: {
                                 if: { $eq: ["$status", "frozen"] },
-                                then: "accepted",
+                                then: "approved",
                                 else: "frozen"
                             }
                         }

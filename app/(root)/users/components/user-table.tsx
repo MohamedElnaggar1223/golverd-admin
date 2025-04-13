@@ -33,7 +33,7 @@ import {
 import { Trash2, Search, User, ChevronLeft, ChevronRight } from 'lucide-react';
 import { IUser } from '@/models/User';
 import { toast } from 'sonner';
-
+import { getQueryClient } from '@/lib/get-query-client';
 // Define a type for the user as returned by MongoDB lean query
 type LeanUser = Omit<IUser, 'addresses'> & {
     addresses: Record<string, any>;
@@ -55,7 +55,7 @@ export default function UserTable({ onUserSelect }: UserTableProps) {
     const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
 
     const debouncedSearch = useDebounce(searchQuery, 300);
-    const queryClient = useQueryClient();
+    const queryClient = getQueryClient();
 
     // Fetch all users
     const { data: users, isLoading, error } = useSuspenseQuery({

@@ -27,7 +27,7 @@ import { IAppointment } from '@/models/Appointment';
 import { useDebounce } from '@/lib/hooks/use-debounce';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
-
+import { getQueryClient } from '@/lib/get-query-client';
 interface UserAppointmentsProps {
     selectedUserId: string | null;
 }
@@ -42,7 +42,7 @@ type LeanAppointment = Omit<IAppointment, 'branchInfo'> & {
 export default function UserAppointments({ selectedUserId }: UserAppointmentsProps) {
     const [searchQuery, setSearchQuery] = useState('');
     const debouncedSearch = useDebounce(searchQuery, 300);
-    const queryClient = useQueryClient();
+    const queryClient = getQueryClient();
 
     // Fetch appointments
     const appointmentsQuery = useQuery({

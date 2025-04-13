@@ -14,7 +14,7 @@ import { Search, Calendar, ChevronDown, ChevronUp } from "lucide-react";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/shared/spinner";
-
+import { getQueryClient } from "@/lib/get-query-client";
 export function AppointmentsTab() {
     const [searchQuery, setSearchQuery] = useState('');
     const [vendorFilter, setVendorFilter] = useState('all');
@@ -22,7 +22,7 @@ export function AppointmentsTab() {
     const [expandedAccordions, setExpandedAccordions] = useState<Record<string, boolean>>({});
     const [isUpdating, setIsUpdating] = useState<string | null>(null);
     const debouncedSearch = useDebounce(searchQuery, 300);
-    const queryClient = useQueryClient();
+    const queryClient = getQueryClient();
 
     // Fetch all appointments
     const { data: appointments = [] } = useSuspenseQuery({

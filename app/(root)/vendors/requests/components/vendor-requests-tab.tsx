@@ -41,7 +41,7 @@ import {
 import { cn } from "@/lib/utils";
 import { CalendarIcon } from "lucide-react";
 import { Input } from '@/components/ui/input'
-
+import { getQueryClient } from "@/lib/get-query-client";
 const approveVendorSchema = z.object({
     rent: z.coerce.number().min(0, "Rent must be a positive number"),
     commission: z.coerce.number().min(0, "Commission must be a positive number").max(100, "Commission cannot exceed 100%"),
@@ -55,7 +55,7 @@ export function VendorRequestsTab() {
     const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
     const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null);
     const [selectedVendorName, setSelectedVendorName] = useState<string>('');
-    const queryClient = useQueryClient();
+    const queryClient = getQueryClient();
 
     // Get all vendors from cache and filter for requests client-side
     const { data: allVendors = [] } = useSuspenseQuery({

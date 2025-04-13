@@ -25,7 +25,7 @@ import {
     ResponsiveContainer,
     Legend,
 } from "recharts";
-
+import { getQueryClient } from "@/lib/get-query-client";
 interface VendorAppointmentsTabProps {
     vendorId: string;
 }
@@ -37,7 +37,7 @@ export function VendorAppointmentsTab({ vendorId }: VendorAppointmentsTabProps) 
     const [isUpdating, setIsUpdating] = useState<string | null>(null);
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const debouncedSearch = useDebounce(searchQuery, 300);
-    const queryClient = useQueryClient();
+    const queryClient = getQueryClient();
 
     // Fetch all appointments
     const { data: allAppointments = [] } = useSuspenseQuery({

@@ -27,7 +27,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
+import { getQueryClient } from "@/lib/get-query-client";
 interface VendorGridProps {
     vendors: any[];
 }
@@ -39,7 +39,7 @@ export function VendorGrid({ vendors }: VendorGridProps) {
     const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null);
     const [selectedVendorName, setSelectedVendorName] = useState<string>('');
     const debouncedSearch = useDebounce(searchQuery, 300);
-    const queryClient = useQueryClient();
+    const queryClient = getQueryClient();
     const router = useRouter();
 
     console.log("vendors", vendors);

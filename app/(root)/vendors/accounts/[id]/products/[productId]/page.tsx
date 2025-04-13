@@ -30,7 +30,7 @@ import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-
+import { getQueryClient } from "@/lib/get-query-client";
 interface ProductPageProps {
     params: Promise<{
         id: string;
@@ -51,7 +51,7 @@ export default function ProductEditPage({ params }: ProductPageProps) {
     const [isUploading, setIsUploading] = useState(false);
     const [selectedImage, setSelectedImage] = useState<File | null>(null);
     const router = useRouter();
-    const queryClient = useQueryClient();
+    const queryClient = getQueryClient();
 
     // Fetch product and vendor data
     const { data: product } = useQuery({
