@@ -27,25 +27,26 @@ export async function generateMetadata({ params }: { params: { id: string } }) {
     }
 }
 
-export default function VendorFinancePage({ params }: { params: { id: string } }) {
+export default async function VendorFinancePage({ params }: { params: Promise<{ id: string }> }) {
     try {
+        const { id } = await params;
         const queryClient = getQueryClient();
 
         // Prefetch vendor data
         void queryClient.prefetchQuery({
-            queryKey: ['vendor', params.id],
-            queryFn: () => getVendorById(params.id)
+            queryKey: ['vendor', id],
+            queryFn: () => getVendorById(id)
         });
 
         // Prefetch vendor bills
         void queryClient.prefetchQuery({
-            queryKey: ['vendorBills', params.id],
-            queryFn: () => getVendorBills(params.id)
+            queryKey: ['vendorBills', id],
+            queryFn: () => getVendorBills(id)
         });
 
         return (
             <Suspense fallback={<div>Loading...</div>}>
-                <VendorFinanceDetail vendorId={params.id} />
+                <VendorFinanceDetail vendorId={id} />
             </Suspense>
         );
     } catch (error) {
