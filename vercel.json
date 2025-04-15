@@ -4,8 +4,5 @@
             "path": "/api/cron/generate-bills",
             "schedule": "0 0 1 * *"
         }
-    ],
-    "env": {
-        "CRON_API_KEY": "@cron_api_key"
-    }
+    ]
 }

@@ -10,7 +10,7 @@ export async function GET(request: Request) {
         // Check for authorization header with API key for security
         // This allows external cron services to securely trigger this endpoint
         const authHeader = request.headers.get('authorization');
-        const apiKey = process.env.CRON_API_KEY;
+        const apiKey = process.env.CRON_SECRET;
 
         // Verify the API key
         if (!apiKey || authHeader !== `Bearer ${apiKey}`) {
