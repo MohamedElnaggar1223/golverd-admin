@@ -5,14 +5,15 @@ import { getVendorBills } from "@/lib/actions/bill-actions";
 import { notFound } from "next/navigation";
 import { getQueryClient } from "@/lib/get-query-client";
 
-export async function generateMetadata({ params }: { params: { id: string } }) {
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
     const queryClient = getQueryClient();
+    const { id } = await params;
 
     // Prefetch vendor data for metadata
     try {
         const vendorData = await queryClient.fetchQuery({
-            queryKey: ['vendor', params.id],
-            queryFn: () => getVendorById(params.id)
+            queryKey: ['vendor', id],
+            queryFn: () => getVendorById(id)
         });
 
         return {
