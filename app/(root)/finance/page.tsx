@@ -3,6 +3,7 @@ import Finance from "./components/finance";
 import { getQueryClient } from "@/lib/get-query-client";
 import { getBills } from "@/lib/actions/bill-actions";
 import { getVendors } from "@/lib/actions/vendor-actions";
+import { HydrationBoundary, dehydrate } from "@tanstack/react-query";
 
 export default function FinancePage() {
     const queryClient = getQueryClient();
@@ -19,8 +20,8 @@ export default function FinancePage() {
     });
 
     return (
-        <Suspense>
+        <HydrationBoundary state={dehydrate(queryClient)}>
             <Finance />
-        </Suspense>
+        </HydrationBoundary>
     )
 } 
