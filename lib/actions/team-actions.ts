@@ -368,7 +368,7 @@ export async function updateTeamMember(
 
         if (!currentUser?.isBusinessOwner &&
             !(currentUser?.position?.permissions?.editTeamMembers ||
-                currentUser?.position?.permissions?.editAll)) {
+                currentUser?.position?.permissions?.editAll) && session.user.id !== id) {
             throw new Error('Unauthorized');
         }
 

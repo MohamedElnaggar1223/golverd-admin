@@ -13,7 +13,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useState, useCallback, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ImagePlus, Loader2, ArrowLeft, Trash2, AlertTriangle, CheckCircle, X, Plus, Send } from "lucide-react";
+import { ImagePlus, Loader2, ArrowLeft, Trash2, AlertTriangle, CheckCircle, X, Plus, Send, QrCode } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getQueryClient } from "@/lib/get-query-client";
@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { TeamMember } from "@/lib/types/teams.types";
 import { formatDistanceToNow } from "date-fns";
 import { Textarea } from "@/components/ui/textarea";
+import QRCode from "react-qr-code";
 import {
     Dialog,
     DialogContent,
@@ -54,6 +55,9 @@ export function TeamMemberEdit({ id }: { id: string }) {
     const [managedVendorIds, setManagedVendorIds] = useState<string[]>([]);
     const [addVendorDialogOpen, setAddVendorDialogOpen] = useState(false);
     const [notificationDialogOpen, setNotificationDialogOpen] = useState(false);
+    const [qrDialogOpen, setQrDialogOpen] = useState(false);
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const profileUrl = `${origin}/public/profile/${id}`;
 
     const teamMembers = queryClient.getQueryData(['team-members']) as TeamMember[]
 
@@ -355,13 +359,43 @@ export function TeamMemberEdit({ id }: { id: string }) {
     return (
         <div className="w-full px-6 py-6">
             <h1 className="text-2xl font-bold mb-6">Edit Team Member: {teamMember.name}</h1>
-            <div className="mb-6">
+            <div className="mb-6 flex justify-between">
                 <Button variant="outline" size="sm" asChild>
                     <Link href="/team" className="flex items-center gap-2">
                         <ArrowLeft className="h-4 w-4" />
                         Back to Team
                     </Link>
                 </Button>
+                <div className="flex gap-2">
+                    <Dialog open={qrDialogOpen} onOpenChange={setQrDialogOpen}>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" size="sm" className="flex items-center gap-2">
+                                <QrCode className="h-4 w-4" />
+                                Scan QR Code
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-md">
+                            <DialogHeader>
+                                <DialogTitle>Team Member QR Code</DialogTitle>
+                                <DialogDescription>
+                                    Scan this QR code to view {teamMember.name}'s public profile
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="flex flex-col items-center justify-center p-6">
+                                <div className="bg-white p-4 rounded-md shadow-sm">
+                                    <QRCode
+                                        size={256}
+                                        value={profileUrl}
+                                        viewBox={`0 0 256 256`}
+                                    />
+                                </div>
+                                <p className="mt-4 text-sm text-center text-gray-500">
+                                    {profileUrl}
+                                </p>
+                            </div>
+                        </DialogContent>
+                    </Dialog>
+                </div>
             </div>
 
             <Card>

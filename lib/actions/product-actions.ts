@@ -1,9 +1,16 @@
 'use server';
 
 import { connectDB } from '@/lib/mongoose';
-import Product from '@/models/Product';
+import Product, { IProduct } from '@/models/Product';
 import { uploadImage, deleteImage } from '@/lib/cloudinary';
 import { getSession } from '@/lib/auth';
+
+// Define a specific type for the capital calculation data
+type ProductCapitalData = {
+    _id: string;
+    price?: number;
+    branches?: Record<string, { inStock?: number }>; // Use Record as returned by .lean()
+};
 
 /**
  * Get product by ID
@@ -78,6 +85,25 @@ export async function getProductsByVendorId(vendorId: string) {
         .lean();
 
     return products;
+}
+
+/**
+ * Get all products with fields needed for capital calculation
+ */
+export async function getAllProductsForCapital(): Promise<ProductCapitalData[]> {
+    await connectDB();
+
+    try {
+        // Select only necessary fields: _id, price and branches (containing inStock)
+        // Mongoose lean() returns plain objects, Map becomes Record
+        const products = await Product.find({}, { _id: 1, price: 1, branches: 1 }).lean();
+
+        // Type assertion to match the expected lean structure
+        return products as ProductCapitalData[];
+    } catch (error) {
+        console.error("Error fetching products for capital calculation:", error);
+        throw new Error("Failed to fetch product data for capital.");
+    }
 }
 
 /**

@@ -12,28 +12,39 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useState, useCallback, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ImagePlus, Loader2, ArrowLeft, CheckCircle, AlertTriangle } from "lucide-react";
+import { ImagePlus, Loader2, ArrowLeft, CheckCircle, AlertTriangle, QrCode } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getQueryClient } from "@/lib/get-query-client";
 import { toast } from "sonner";
 import { TeamMember } from "@/lib/types/teams.types";
 import { formatDistanceToNow } from "date-fns";
+import QRCode from "react-qr-code";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
 
 const profileFormSchema = z.object({
     name: z.string().min(1, "Name is required"),
     email: z.string().email("Invalid email address"),
     password: z.string().optional(),
-    positionId: z.string().min(1, "Position is required"),
     profilePicture: z.string().optional(),
 });
 
 export function ProfileEdit({ id }: { id: string }) {
     const router = useRouter();
-    const queryClient = getQueryClient()
+    const queryClient = getQueryClient();
     const [uploadingImage, setUploadingImage] = useState(false);
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     const [ranOnce, setRanOnce] = useState(false);
+    const [qrDialogOpen, setQrDialogOpen] = useState(false);
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const profileUrl = `${origin}/public/profile/${id}`;
 
     const teamMembers = queryClient.getQueryData(['team-members']) as TeamMember[]
 
@@ -95,7 +106,6 @@ export function ProfileEdit({ id }: { id: string }) {
             name: teamMember?.name || "",
             email: teamMember?.email || "",
             password: undefined,
-            positionId: teamMember?.positionId || "",
             profilePicture: teamMember?.profilePicture || "",
         }
     });
@@ -107,7 +117,6 @@ export function ProfileEdit({ id }: { id: string }) {
                 name: teamMember.name,
                 email: teamMember.email,
                 password: undefined,
-                positionId: teamMember.position?._id,
                 profilePicture: teamMember.profilePicture || "",
             });
 
@@ -126,7 +135,13 @@ export function ProfileEdit({ id }: { id: string }) {
             delete data.password;
         }
 
-        updateProfileMutation.mutate(data);
+        // Create a submission object that includes positionId
+        const submission = {
+            ...data,
+            positionId: teamMember?.position?._id || ''
+        };
+
+        updateProfileMutation.mutate(submission);
     };
 
     // Handle image upload
@@ -192,13 +207,41 @@ export function ProfileEdit({ id }: { id: string }) {
     return (
         <div className="w-full px-6 py-6">
             <h1 className="text-2xl font-bold mb-6">Edit Your Profile</h1>
-            <div className="mb-6">
+            <div className="mb-6 flex justify-between">
                 <Button variant="outline" size="sm" asChild>
                     <Link href="/" className="flex items-center gap-2">
                         <ArrowLeft className="h-4 w-4" />
                         Back to Dashboard
                     </Link>
                 </Button>
+                <Dialog open={qrDialogOpen} onOpenChange={setQrDialogOpen}>
+                    <DialogTrigger asChild>
+                        <Button variant="outline" size="sm" className="flex items-center gap-2">
+                            <QrCode className="h-4 w-4" />
+                            Scan QR Code
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>Profile QR Code</DialogTitle>
+                            <DialogDescription>
+                                Scan this QR code to view {teamMember.name}'s public profile
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="flex flex-col items-center justify-center p-6">
+                            <div className="bg-white p-4 rounded-md shadow-sm">
+                                <QRCode
+                                    size={256}
+                                    value={profileUrl}
+                                    viewBox={`0 0 256 256`}
+                                />
+                            </div>
+                            <p className="mt-4 text-sm text-center text-gray-500">
+                                {profileUrl}
+                            </p>
+                        </div>
+                    </DialogContent>
+                </Dialog>
             </div>
 
             <Card>
@@ -318,39 +361,17 @@ export function ProfileEdit({ id }: { id: string }) {
                                             </FormItem>
                                         )}
                                     />
+                                </div>
 
-                                    <FormField
-                                        control={form.control}
-                                        name="positionId"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Position</FormLabel>
-                                                <Select
-                                                    onValueChange={ranOnce ? field.onChange : () => { }}
-                                                    value={field.value || ""}
-                                                    defaultValue={field.value || ""}
-                                                    disabled
-                                                >
-                                                    <FormControl>
-                                                        <SelectTrigger className="rounded-[4px] px-4 py-5 bg-[#E8E4E1] border border-[#44312D]">
-                                                            <SelectValue placeholder="Select a position" />
-                                                        </SelectTrigger>
-                                                    </FormControl>
-                                                    <SelectContent>
-                                                        {positions?.map((position: any) => (
-                                                            <SelectItem key={position?._id} value={position?._id}>
-                                                                {position?.name}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                                <FormDescription>
-                                                    Your position in the organization (can only be changed by an administrator)
-                                                </FormDescription>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
+                                {/* Display position information as read-only */}
+                                <div className="mt-4 pt-4 border-t border-gray-100">
+                                    <div className="flex items-center">
+                                        <span className="text-sm font-medium text-gray-700 mr-2">Position:</span>
+                                        <span className="text-sm text-gray-600">{teamMember.position?.name || 'No Position'}</span>
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        Your position can only be changed by an administrator
+                                    </p>
                                 </div>
                             </div>
 
