@@ -6,11 +6,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useParams } from 'next/navigation';
 
-export default function PublicProfile({ params }: { params: { id: string } }) {
+export default function PublicProfile() {
     const [teamMember, setTeamMember] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const params = useParams<{ id: string }>();
 
     useEffect(() => {
         const fetchTeamMember = async () => {
