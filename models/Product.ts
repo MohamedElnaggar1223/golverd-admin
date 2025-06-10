@@ -50,6 +50,7 @@ export interface IProduct {
     weight?: number;
     createdAt: Date;
     updatedAt: Date;
+    totalViews?: number;
 }
 
 interface IProductModel extends Model<IProduct> { }
@@ -141,7 +142,11 @@ const ProductSchema = new Schema<IProduct>(
         segment: Number,
         serialID: String,
         silverKarat: String,
-        weight: Number
+        weight: Number,
+        totalViews: {
+            type: Number,
+            default: 0
+        }
     },
     {
         timestamps: true,

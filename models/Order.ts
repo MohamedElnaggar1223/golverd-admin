@@ -41,6 +41,7 @@ export interface IOrder extends Document {
     price?: number;
     promocode?: string;
     status: string;
+    saleStatus?: string;
     vendorID?: string;
     createdAt: Date;
     updatedAt: Date;
@@ -110,6 +111,11 @@ const OrderSchema = new Schema<IOrder>(
         status: {
             type: String,
             default: 'pending'
+        },
+        saleStatus: {
+            type: String,
+            default: 'No Sale',
+            enum: ['No Sale', 'Sold']
         },
         vendorID: {
             type: String,

@@ -7,6 +7,7 @@ import { formatDate, cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Search, Calendar, ChevronDown, ChevronUp } from "lucide-react";
@@ -32,7 +33,6 @@ interface VendorAppointmentsTabProps {
 
 export function VendorAppointmentsTab({ vendorId }: VendorAppointmentsTabProps) {
     const [searchQuery, setSearchQuery] = useState('');
-    const [timeFilter, setTimeFilter] = useState('all'); // all, upcoming, cancelled
     const [expandedAccordions, setExpandedAccordions] = useState<Record<string, boolean>>({});
     const [isUpdating, setIsUpdating] = useState<string | null>(null);
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -45,10 +45,12 @@ export function VendorAppointmentsTab({ vendorId }: VendorAppointmentsTabProps) 
         queryFn: getAppointments
     });
 
-    // Filter appointments by vendor ID
+    // Filter appointments by vendor ID and show upcoming/cancelled appointments that haven't been converted to sales
     const vendorAppointments = useMemo(() => {
         return allAppointments.filter((appointment: any) =>
-            appointment.vendorID?._id === vendorId || appointment.vendorID === vendorId
+            (appointment.vendorID?._id === vendorId || appointment.vendorID === vendorId) &&
+            (appointment.status === 'upcoming' || appointment.status === 'cancelled') &&
+            appointment.saleStatus?.toLowerCase() !== 'sold'
         );
     }, [allAppointments, vendorId]);
 
@@ -83,7 +85,7 @@ export function VendorAppointmentsTab({ vendorId }: VendorAppointmentsTabProps) 
         }));
     };
 
-    // Filter appointments based on search and time
+    // Filter appointments based on search only (status is already filtered to upcoming)
     const filteredAppointments = useMemo(() => {
         if (!vendorAppointments) return [];
 
@@ -92,21 +94,11 @@ export function VendorAppointmentsTab({ vendorId }: VendorAppointmentsTabProps) 
             const matchesSearch = !debouncedSearch ||
                 (appointment.customerName || '').toLowerCase().includes(debouncedSearch.toLowerCase()) ||
                 (appointment.customerPhone || '').toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-                (appointment.serviceType || '').toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-                (appointment.saleStatus || '').toLowerCase().includes(debouncedSearch.toLowerCase());
+                (appointment.serviceType || '').toLowerCase().includes(debouncedSearch.toLowerCase());
 
-            let matchesTime = true;
-            if (timeFilter !== 'all') {
-                if (timeFilter === 'upcoming') {
-                    matchesTime = appointment.status === 'upcoming';
-                } else if (timeFilter === 'cancelled') {
-                    matchesTime = appointment.status === 'cancelled';
-                }
-            }
-
-            return matchesSearch && matchesTime;
+            return matchesSearch;
         });
-    }, [vendorAppointments, debouncedSearch, timeFilter]);
+    }, [vendorAppointments, debouncedSearch]);
 
     // Mutation for toggling sale status
     const toggleSaleStatusMutation = useMutation({
@@ -205,16 +197,6 @@ export function VendorAppointmentsTab({ vendorId }: VendorAppointmentsTabProps) 
                         className="pl-8 w-full rounded-sm"
                     />
                 </div>
-                <Select value={timeFilter} onValueChange={setTimeFilter}>
-                    <SelectTrigger className="w-full sm:w-[200px] rounded-sm bg-white">
-                        <SelectValue placeholder="Filter by time" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Time</SelectItem>
-                        <SelectItem value="upcoming">Upcoming</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                </Select>
             </div>
 
             <ScrollArea className="h-[calc(100vh-600px)]">
@@ -245,7 +227,7 @@ export function VendorAppointmentsTab({ vendorId }: VendorAppointmentsTabProps) 
                                             </div>
                                         </div>
 
-                                        {appointment.saleStatus?.toLowerCase() !== 'sold' && (
+                                        {appointment.status === 'upcoming' && appointment.saleStatus?.toLowerCase() !== 'sold' ? (
                                             <Button
                                                 size="sm"
                                                 className="rounded-[4px] px-4 py-5 bg-[#2A1C1B] hover:bg-[#44312D] text-white"
@@ -257,7 +239,11 @@ export function VendorAppointmentsTab({ vendorId }: VendorAppointmentsTabProps) 
                                                 ) : null}
                                                 Convert to Sale
                                             </Button>
-                                        )}
+                                        ) : appointment.status === 'cancelled' ? (
+                                            <Badge variant="outline" className="font-normal rounded-sm bg-red-100 text-red-800 hover:bg-red-100">
+                                                Cancelled
+                                            </Badge>
+                                        ) : null}
                                     </div>
                                 </CardHeader>
 
@@ -312,7 +298,7 @@ export function VendorAppointmentsTab({ vendorId }: VendorAppointmentsTabProps) 
 
                     {filteredAppointments.length === 0 && (
                         <div className="col-span-3 text-center py-8 text-gray-500">
-                            No appointments found. Try adjusting your search or filter.
+                            No appointments found. Try adjusting your search.
                         </div>
                     )}
                 </div>

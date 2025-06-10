@@ -167,11 +167,16 @@ export async function generateMonthlyBills(skipPermissionCheck = false) {
         const currentMonth = currentDate.getMonth() + 1; // JS months are 0-indexed
         const currentYear = currentDate.getFullYear();
 
+        console.log("Generating bills for the current month");
+        console.log(currentMonth, currentYear);
+
         // Get all active vendors
         const vendors = await Vendor.find({
             activationDate: { $exists: true, $ne: null },
             status: "approved"
         }).lean();
+
+        console.log("Vendors: ", vendors);
 
         let created = 0;
         let skipped = 0;
@@ -181,6 +186,13 @@ export async function generateMonthlyBills(skipPermissionCheck = false) {
             if (!vendor.activationDate) continue;
 
             const activationDate = new Date(vendor.activationDate);
+            console.log("Activation date: ", activationDate);
+            console.log("Current month: ", currentMonth);
+            console.log("Current year: ", currentYear);
+            console.log("Activation date year: ", activationDate.getFullYear());
+            console.log("Activation date month: ", activationDate.getMonth() + 1);
+            console.log("Activation date day: ", activationDate.getDate());
+
             if (
                 activationDate.getFullYear() > currentYear ||
                 (activationDate.getFullYear() === currentYear &&
@@ -206,9 +218,15 @@ export async function generateMonthlyBills(skipPermissionCheck = false) {
             const startOfMonth = new Date(currentYear, currentMonth - 1, 1);
             const endOfMonth = new Date(currentYear, currentMonth, 0);
 
+            console.log("Start of month: ", startOfMonth);
+            console.log("End of month: ", endOfMonth);
+
             // Convert dates to seconds for comparison with orderDate._seconds
             const startSeconds = Math.floor(startOfMonth.getTime() / 1000);
             const endSeconds = Math.floor(endOfMonth.getTime() / 1000);
+
+            console.log("Start seconds: ", startSeconds);
+            console.log("End seconds: ", endSeconds);
 
             const vendorOrders = await Order.find({
                 vendorID: vendor._id,
@@ -218,6 +236,8 @@ export async function generateMonthlyBills(skipPermissionCheck = false) {
                     $lt: endSeconds
                 }
             }).lean();
+
+            console.log("Vendor orders: ", vendorOrders);
 
             // Calculate total sales amount from orders
             const totalSales = vendorOrders.reduce((sum, order) => {
@@ -245,8 +265,12 @@ export async function generateMonthlyBills(skipPermissionCheck = false) {
                 return sum + orderTotal;
             }, 0);
 
+            console.log("Total sales: ", totalSales);
+
             // Calculate commission based on total sales
             const commission = totalSales * (vendor.commission || 0) / 100;
+
+            console.log("Commission: ", commission);
 
             // Create new bill
             const newBill = new Bill({

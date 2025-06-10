@@ -78,4 +78,23 @@ export async function getOrdersByClientId(clientId: string) {
         .lean();
 
     return orders;
+}
+
+/**
+ * Toggle order sale status
+ */
+export async function toggleOrderSaleStatus(orderId: string) {
+    await connectDB();
+
+    await requirePermission([PERMISSION_KEYS.EDIT_ORDERS, PERMISSION_KEYS.EDIT_ALL]);
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+        throw new Error('Order not found');
+    }
+
+    order.status = order.status === 'Completed' ? 'cancelled' : 'Completed';
+    await order.save();
+
+    return { success: true, status: order.status };
 } 

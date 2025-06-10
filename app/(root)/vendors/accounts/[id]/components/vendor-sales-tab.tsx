@@ -62,12 +62,15 @@ export function VendorSalesTab({ vendorId }: VendorSalesTabProps) {
         queryFn: getAppointments
     });
 
-    // Filter orders by vendor ID
+    // Filter orders by vendor ID and only show converted sales
     const vendorOrders = useMemo(() => {
-        return allOrders.filter((order: any) => order.vendorID?._id === vendorId);
+        return allOrders.filter((order: any) =>
+            order.vendorID?._id === vendorId &&
+            order.status === 'Completed'
+        );
     }, [allOrders, vendorId]);
 
-    // Filter appointments by vendor ID
+    // Filter appointments by vendor ID and only show converted sales
     const vendorAppointments = useMemo(() => {
         return allAppointments.filter((appointment: any) =>
             (appointment.vendorID?._id === vendorId || appointment.vendorID === vendorId) &&

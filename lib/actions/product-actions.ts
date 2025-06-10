@@ -182,6 +182,36 @@ export async function deleteProductImage(productId: string, imageUrl: string) {
 }
 
 /**
+ * Get top viewed products for dashboard
+ */
+export async function getTopViewedProducts(limit: number = 5) {
+    try {
+        await connectDB();
+
+        // Get top viewed products with necessary fields
+        const products = await Product.find(
+            { totalViews: { $gt: 0 } }, // Only products with views
+            {
+                _id: 1,
+                name: 1,
+                images: 1,
+                totalViews: 1,
+                brandDocID: 1
+            }
+        )
+            .sort({ totalViews: -1 }) // Sort by views descending
+            .limit(limit)
+            .lean();
+
+        return products;
+    } catch (error) {
+        console.error("Error fetching top viewed products:", error);
+        // During build/prerender, return empty array instead of throwing
+        return [];
+    }
+}
+
+/**
  * Update product information
  */
 export async function updateProduct(productId: string, data: any) {

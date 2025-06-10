@@ -99,6 +99,7 @@ export function OrdersTab() {
                 order._id.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
                 (order.vendorID?.name || '').toLowerCase().includes(debouncedSearch.toLowerCase()) ||
                 (order.clientName || '').toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+                (order.address?.address || '').toLowerCase().includes(debouncedSearch.toLowerCase()) ||
                 (order.status || '').toLowerCase().includes(debouncedSearch.toLowerCase()) ||
                 (order.paymentMethod || '').toLowerCase().includes(debouncedSearch.toLowerCase());
 
@@ -168,6 +169,7 @@ export function OrdersTab() {
                             <TableHead className="font-medium text-[#44312D]">Order ID</TableHead>
                             <TableHead className="font-medium text-[#44312D]">Vendor Name</TableHead>
                             <TableHead className="font-medium text-[#44312D]">Client Name</TableHead>
+                            <TableHead className="font-medium text-[#44312D]">Address</TableHead>
                             <TableHead className="font-medium text-[#44312D]">Price</TableHead>
                             <TableHead className="font-medium text-[#44312D]">Payment Method</TableHead>
                             <TableHead className="font-medium text-[#44312D]">Status</TableHead>
@@ -214,6 +216,11 @@ export function OrdersTab() {
                                             </span>
                                         </div>
                                     </TableCell>
+                                    <TableCell>
+                                        <div className="max-w-[200px] truncate" title={order.address?.address || 'N/A'}>
+                                            {order.address?.address || 'N/A'}
+                                        </div>
+                                    </TableCell>
                                     <TableCell>{formatCurrency(order.price || 0, 'en-US', 'EGP')}</TableCell>
                                     <TableCell>{order.paymentMethod || 'N/A'}</TableCell>
                                     <TableCell>
@@ -233,7 +240,7 @@ export function OrdersTab() {
 
                         {filteredOrders.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                                <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                                     No orders found. Try adjusting your search or filter.
                                 </TableCell>
                             </TableRow>

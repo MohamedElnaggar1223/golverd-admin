@@ -1,19 +1,23 @@
 'use client';
 
 import { useState, useMemo } from "react";
-import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
-import { getOrders } from "@/lib/actions/order-actions";
+import { useQuery, useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getOrders, toggleOrderSaleStatus } from "@/lib/actions/order-actions";
 import { getProductsByIds } from "@/lib/actions/product-actions";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Search } from "lucide-react";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { Spinner } from "@/components/shared/spinner";
+import { toast } from "sonner";
+import { AlertTriangle, CheckCircle } from "lucide-react";
 import {
     Table,
     TableBody,
@@ -48,11 +52,12 @@ interface VendorOrdersTabProps {
 
 export function VendorOrdersTab({ vendorId }: VendorOrdersTabProps) {
     const [searchQuery, setSearchQuery] = useState('');
-    const [statusFilter, setStatusFilter] = useState('all');
     const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+    const [isUpdating, setIsUpdating] = useState<string | null>(null);
     const debouncedSearch = useDebounce(searchQuery, 300);
+    const queryClient = useQueryClient();
 
     // Fetch all orders
     const { data: allOrders = [] } = useSuspenseQuery({
@@ -60,9 +65,13 @@ export function VendorOrdersTab({ vendorId }: VendorOrdersTabProps) {
         queryFn: getOrders
     });
 
-    // Filter orders by vendor ID
+    // Filter orders by vendor ID and show pending/cancelled orders that haven't been converted to sales
     const vendorOrders = useMemo(() => {
-        return allOrders.filter((order: any) => order.vendorID?._id === vendorId);
+        return allOrders.filter((order: any) =>
+            order.vendorID?._id === vendorId &&
+            (order.status === 'pending' || order.status === 'cancelled') &&
+            order.saleStatus !== 'Sold'
+        );
     }, [allOrders, vendorId]);
 
     // Get all unique product IDs from vendor orders
@@ -126,22 +135,43 @@ export function VendorOrdersTab({ vendorId }: VendorOrdersTabProps) {
         return data;
     }, [vendorOrders, selectedYear]);
 
-    // Filter orders based on search and status
+    // Filter orders based on search only (status is already filtered to pending)
     const filteredOrders = useMemo(() => {
         return vendorOrders.filter((order: any) => {
             // Apply search filter
             const matchesSearch = !debouncedSearch ||
                 order._id.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
                 (order.clientName || '').toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-                (order.status || '').toLowerCase().includes(debouncedSearch.toLowerCase()) ||
                 (order.paymentMethod || '').toLowerCase().includes(debouncedSearch.toLowerCase());
 
-            // Apply status filter
-            const matchesStatus = statusFilter === 'all' || order.status.toLowerCase() === statusFilter.toLowerCase();
-
-            return matchesSearch && matchesStatus;
+            return matchesSearch;
         });
-    }, [vendorOrders, debouncedSearch, statusFilter]);
+    }, [vendorOrders, debouncedSearch]);
+
+    // Mutation for toggling sale status
+    const toggleSaleStatusMutation = useMutation({
+        mutationFn: async (orderId: string) => {
+            setIsUpdating(orderId);
+            try {
+                await toggleOrderSaleStatus(orderId);
+            } finally {
+                setIsUpdating(null);
+            }
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['orders'] });
+            toast("Sale status updated", {
+                description: "The order has been converted to sale successfully.",
+                icon: <CheckCircle className="h-5 w-5 text-green-500" />,
+            });
+        },
+        onError: (error: any) => {
+            toast("Error", {
+                description: error.message || "Failed to convert order to sale",
+                icon: <AlertTriangle className="h-5 w-5 text-red-500" />,
+            });
+        }
+    });
 
     // Handle showing product details in dialog
     const showProductDetails = (products: Product[]) => {
@@ -149,18 +179,7 @@ export function VendorOrdersTab({ vendorId }: VendorOrdersTabProps) {
         setIsDialogOpen(true);
     };
 
-    // Get status badge styling
-    const getStatusBadge = (status: string) => {
-        const statusMap: Record<string, string> = {
-            'completed': 'bg-green-100 text-green-800 hover:bg-green-100',
-            'processing': 'bg-blue-100 text-blue-800 hover:bg-blue-100',
-            'shipped': 'bg-purple-100 text-purple-800 hover:bg-purple-100',
-            'cancelled': 'bg-red-100 text-red-800 hover:bg-red-100',
-            'pending': 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'
-        };
 
-        return statusMap[status.toLowerCase()] || 'bg-gray-100 text-gray-800 hover:bg-gray-100';
-    };
 
     // Create initials for product avatar fallback
     const getProductInitials = (name: string): string => {
@@ -233,19 +252,6 @@ export function VendorOrdersTab({ vendorId }: VendorOrdersTabProps) {
                         className="pl-8 w-full rounded-sm"
                     />
                 </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-full sm:w-[200px] rounded-sm bg-white">
-                        <SelectValue placeholder="Filter by status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Statuses</SelectItem>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="processing">Processing</SelectItem>
-                        <SelectItem value="shipped">Shipped</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                </Select>
             </div>
 
             <ScrollArea className="h-[calc(100vh-600px)]">
@@ -257,7 +263,7 @@ export function VendorOrdersTab({ vendorId }: VendorOrdersTabProps) {
                             <TableHead className="font-medium text-[#44312D]">Client Name</TableHead>
                             <TableHead className="font-medium text-[#44312D]">Price</TableHead>
                             <TableHead className="font-medium text-[#44312D]">Payment Method</TableHead>
-                            <TableHead className="font-medium text-[#44312D]">Status</TableHead>
+                            <TableHead className="font-medium text-[#44312D]">Convert to Sale</TableHead>
                             <TableHead className="font-medium text-[#44312D]">Date</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -303,9 +309,23 @@ export function VendorOrdersTab({ vendorId }: VendorOrdersTabProps) {
                                     <TableCell>{formatCurrency(order.price || 0, 'en-US', 'EGP')}</TableCell>
                                     <TableCell>{order.paymentMethod || 'N/A'}</TableCell>
                                     <TableCell>
-                                        <Badge variant="outline" className={`font-normal rounded-sm ${getStatusBadge(order.status)}`}>
-                                            {order.status}
-                                        </Badge>
+                                        {order.status === 'pending' ? (
+                                            <Button
+                                                size="sm"
+                                                className="bg-[#44312D] hover:bg-[#2D1F1B] text-white"
+                                                onClick={() => toggleSaleStatusMutation.mutate(order._id)}
+                                                disabled={isUpdating === order._id}
+                                            >
+                                                {isUpdating === order._id ? (
+                                                    <Spinner className="h-3 w-3 mr-2" />
+                                                ) : null}
+                                                Convert to Sale
+                                            </Button>
+                                        ) : (
+                                            <Badge variant="outline" className="font-normal rounded-sm bg-red-100 text-red-800 hover:bg-red-100">
+                                                Cancelled
+                                            </Badge>
+                                        )}
                                     </TableCell>
                                     <TableCell>
                                         {order.orderDate
@@ -320,7 +340,7 @@ export function VendorOrdersTab({ vendorId }: VendorOrdersTabProps) {
                         {filteredOrders.length === 0 && (
                             <TableRow>
                                 <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                                    No orders found. Try adjusting your search or filter.
+                                    No orders found. Try adjusting your search.
                                 </TableCell>
                             </TableRow>
                         )}
