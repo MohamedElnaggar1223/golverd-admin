@@ -15,7 +15,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ImagePlus, Loader2 } from "lucide-react";
 import Image from "next/image";
 import { getQueryClient } from "@/lib/get-query-client";
-import { toast } from "sonner"
+import { toast } from "sonner";
+import { PhoneInput } from "@/components/ui/phone-input";
 
 const teamMemberFormSchema = z.object({
     name: z.string().min(1, "Name is required"),
@@ -23,6 +24,7 @@ const teamMemberFormSchema = z.object({
     password: z.string().min(8, "Password must be at least 8 characters"),
     positionId: z.string().min(1, "Position is required"),
     profilePicture: z.string().optional(),
+    phoneNumber: z.string().optional(),
     accountsManaged: z.array(z.string()).optional(),
 });
 
@@ -76,6 +78,7 @@ export function NewTeamMemberTab() {
             password: "",
             positionId: "",
             profilePicture: "",
+            phoneNumber: "",
             accountsManaged: [],
         }
     });
@@ -218,6 +221,27 @@ export function NewTeamMemberTab() {
                                             <FormLabel>Email</FormLabel>
                                             <FormControl>
                                                 <Input className='rounded-[4px] px-4 py-5 bg-[#E8E4E1] border border-[#44312D]' placeholder="john@example.com" type="email" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="phoneNumber"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Phone Number</FormLabel>
+                                            <FormControl>
+                                                <PhoneInput
+                                                    defaultCountry="EG"
+                                                    international
+                                                    withCountryCallingCode
+                                                    value={field.value}
+                                                    onChange={field.onChange}
+                                                    className="rounded-[4px] px-4 py-5 bg-[#E8E4E1] border border-[#44312D]"
+                                                />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>

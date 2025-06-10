@@ -265,6 +265,7 @@ export async function createTeamMember(data: {
     password: string;
     positionId: string;
     profilePicture?: any;
+    phoneNumber?: string;
     accountsManaged?: string[];
 }) {
     try {
@@ -305,6 +306,7 @@ export async function createTeamMember(data: {
             password: data.password,
             positionId: data.positionId,
             profilePicture: imageUrl || '',
+            phoneNumber: data.phoneNumber || '',
             accountsManaged: data.accountsManaged || [],
             role: 'super',
             isActive: true,
@@ -320,6 +322,7 @@ export async function createTeamMember(data: {
             email: teamMember.email,
             positionId: teamMember.positionId,
             profilePicture: teamMember.profilePicture,
+            phoneNumber: teamMember.phoneNumber,
             accountsManaged: teamMember.accountsManaged,
             role: teamMember.role,
             isActive: teamMember.isActive,
@@ -341,6 +344,7 @@ export async function updateTeamMember(
         password?: string;
         positionId?: string;
         profilePicture?: any;
+        phoneNumber?: string;
         accountsManaged?: string[];
     }
 ) {
@@ -393,6 +397,7 @@ export async function updateTeamMember(
         if (data.profilePicture !== undefined && typeof data.profilePicture === 'string') {
             teamMember.profilePicture = data.profilePicture;
         }
+        if (data.phoneNumber !== undefined) teamMember.phoneNumber = data.phoneNumber;
         if (data.positionId !== undefined) teamMember.positionId = data.positionId;
         if (data.accountsManaged !== undefined) teamMember.accountsManaged = data.accountsManaged;
 
@@ -461,7 +466,7 @@ export async function getPublicTeamMemberById(id: string) {
         // No authentication required for public profiles
         const teamMember = await SuperUser.findById(id)
             .populate('position')
-            .select('name email profilePicture position createdAt')
+            .select('name email phoneNumber profilePicture position createdAt')
             .lean();
 
         return teamMember;

@@ -11,6 +11,7 @@ export interface ISuperUser extends Document {
     positionId?: string;
     position?: any; // Populated field
     accountsManaged: string[]; // Array of vendor IDs
+    phoneNumber?: string;
     role: 'admin' | 'super';
     isActive: boolean;
     lastLogin?: Date;
@@ -61,6 +62,10 @@ const SuperUserSchema = new Schema<ISuperUser>(
             type: String,
             ref: 'Vendor'
         }],
+        phoneNumber: {
+            type: String,
+            default: ''
+        },
         role: {
             type: String,
             enum: ['admin', 'super'],

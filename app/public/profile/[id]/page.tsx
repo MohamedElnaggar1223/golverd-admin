@@ -98,13 +98,16 @@ export default function PublicProfile() {
                         <div className="bg-gray-50 p-4 rounded-lg">
                             <h3 className="font-medium text-gray-700 mb-2">Contact Information</h3>
                             <p className="text-gray-600"><span className="font-medium">Email:</span> {teamMember.email}</p>
+                            {teamMember.phoneNumber && (
+                                <p className="text-gray-600 mt-1"><span className="font-medium">Phone:</span> {teamMember.phoneNumber}</p>
+                            )}
                         </div>
 
-                        {teamMember.createdAt && (
+                        {teamMember.position && (
                             <div className="bg-gray-50 p-4 rounded-lg">
                                 <h3 className="font-medium text-gray-700 mb-2">Team Information</h3>
                                 <p className="text-gray-600">
-                                    <span className="font-medium">Joined:</span> {formatDistanceToNow(new Date(teamMember.createdAt), { addSuffix: true })}
+                                    <span className="font-medium">Position:</span> {teamMember.position.name}
                                 </p>
                             </div>
                         )}

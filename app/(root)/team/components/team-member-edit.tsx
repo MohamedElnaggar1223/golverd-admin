@@ -22,6 +22,7 @@ import { TeamMember } from "@/lib/types/teams.types";
 import { formatDistanceToNow } from "date-fns";
 import { Textarea } from "@/components/ui/textarea";
 import QRCode from "react-qr-code";
+import { PhoneInput } from "@/components/ui/phone-input";
 import {
     Dialog,
     DialogContent,
@@ -38,6 +39,7 @@ const teamMemberFormSchema = z.object({
     password: z.string().optional(),
     positionId: z.string().min(1, "Position is required"),
     profilePicture: z.string().optional(),
+    phoneNumber: z.string().optional(),
     accountsManaged: z.array(z.string()).optional(),
     notification: z.object({
         title: z.string().optional(),
@@ -213,6 +215,7 @@ export function TeamMemberEdit({ id }: { id: string }) {
             password: undefined,
             positionId: teamMember?.positionId || "",
             profilePicture: teamMember?.profilePicture || "",
+            phoneNumber: teamMember?.phoneNumber || "",
             accountsManaged: managedVendorIds,
             notification: {
                 title: "",
@@ -230,6 +233,7 @@ export function TeamMemberEdit({ id }: { id: string }) {
                 password: undefined,
                 positionId: teamMember.position?._id,
                 profilePicture: teamMember.profilePicture || "",
+                phoneNumber: teamMember.phoneNumber || "",
                 accountsManaged: teamMember.accountsManaged || [],
                 notification: {
                     title: "",
@@ -537,6 +541,31 @@ export function TeamMemberEdit({ id }: { id: string }) {
                                                 <FormControl>
                                                     <Input className='rounded-[4px] px-4 py-5 bg-[#E8E4E1] border border-[#44312D]' placeholder="john@example.com" type="email" {...field} />
                                                 </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+
+                                    <FormField
+                                        control={form.control}
+                                        name="phoneNumber"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Phone Number</FormLabel>
+                                                <FormControl>
+                                                    <PhoneInput
+                                                        defaultCountry="EG"
+                                                        international
+                                                        // withCountryCallingCode
+                                                        value={field.value}
+                                                        onChange={field.onChange}
+                                                        className='rounded-[4px]'
+                                                    // className="rounded-[4px]  bg-[#E8E4E1] border border-[#44312D]"
+                                                    />
+                                                </FormControl>
+                                                <FormDescription>
+                                                    Enter the team member's phone number
+                                                </FormDescription>
                                                 <FormMessage />
                                             </FormItem>
                                         )}
