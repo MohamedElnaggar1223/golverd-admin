@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getTeamMemberById } from '@/lib/actions/team-actions';
+import { getPublicTeamMemberById } from '@/lib/actions/team-actions';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDistanceToNow } from 'date-fns';
@@ -18,7 +18,7 @@ export default function PublicProfile() {
         const fetchTeamMember = async () => {
             try {
                 setLoading(true);
-                const data = await getTeamMemberById(params.id);
+                const data = await getPublicTeamMemberById(params.id);
                 setTeamMember(data);
             } catch (err) {
                 console.error('Error fetching team member:', err);

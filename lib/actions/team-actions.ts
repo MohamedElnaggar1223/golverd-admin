@@ -451,4 +451,22 @@ export async function deleteTeamMember(id: string) {
         console.error('Error deleting team member:', error);
         throw error;
     }
+}
+
+// Public version of getTeamMemberById for public profiles
+export async function getPublicTeamMemberById(id: string) {
+    try {
+        await connectDB();
+
+        // No authentication required for public profiles
+        const teamMember = await SuperUser.findById(id)
+            .populate('position')
+            .select('name email profilePicture position createdAt')
+            .lean();
+
+        return teamMember;
+    } catch (error) {
+        console.error('Error fetching public team member:', error);
+        throw error;
+    }
 } 

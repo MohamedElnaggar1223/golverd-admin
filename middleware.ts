@@ -6,7 +6,7 @@ export async function middleware(req: NextRequest) {
     const path = req.nextUrl.pathname;
 
     // Define public paths that don't require authentication
-    const isPublicPath = path === "/signin";
+    const isPublicPath = path === "/signin" || path.startsWith("/public");
 
     // Get token to verify if user is authenticated and get permissions
     const token = await getToken({
