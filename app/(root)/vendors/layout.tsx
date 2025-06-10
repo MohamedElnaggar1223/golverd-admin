@@ -2,6 +2,9 @@ import { getQueryClient } from "@/lib/get-query-client";
 import { getVendors } from "@/lib/actions/vendor-actions";
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 
+// Force dynamic rendering for authenticated routes
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
     title: "Vendors | Golverd Admin",
     description: "Manage vendor accounts and requests",

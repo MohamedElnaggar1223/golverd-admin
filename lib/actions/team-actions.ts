@@ -26,7 +26,11 @@ export async function getPositions() {
 
         const positions = await Position.find().sort({ name: 1 }).lean();
         return positions;
-    } catch (error) {
+    } catch (error: any) {
+        // During build/prerender, return empty array instead of throwing
+        if (error.name === 'AuthenticationError' || error.name === 'AuthorizationError') {
+            return [];
+        }
         console.error('Error fetching positions:', error);
         return [];
     }
@@ -171,7 +175,11 @@ export async function getTeamMembers() {
             .lean();
 
         return teamMembers;
-    } catch (error) {
+    } catch (error: any) {
+        // During build/prerender, return empty array instead of throwing
+        if (error.name === 'AuthenticationError' || error.name === 'AuthorizationError') {
+            return [];
+        }
         console.error('Error fetching team members:', error);
         return [];
     }

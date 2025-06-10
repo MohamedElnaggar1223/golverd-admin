@@ -1,6 +1,14 @@
 import { getSession, getCurrentUser } from '@/lib/auth';
 import { UserPermissions, hasPermission, canViewRoute, canEditInRoute, PermissionKey } from '@/lib/permissions';
 
+/**
+ * Auth Guards for Server Actions
+ * 
+ * Note: Server actions that are used in prefetching during build/prerender
+ * should handle AuthenticationError gracefully by returning empty data
+ * instead of throwing, since there's no user session during build time.
+ */
+
 export interface AuthenticatedUser {
     id: string;
     email: string;
@@ -52,6 +60,8 @@ export async function requireAuth(): Promise<AuthenticatedUser> {
 
     return currentUser as AuthenticatedUser;
 }
+
+
 
 /**
  * Require specific permission(s)

@@ -91,9 +91,10 @@ export async function getProductsByVendorId(vendorId: string) {
  * Get all products with fields needed for capital calculation
  */
 export async function getAllProductsForCapital(): Promise<ProductCapitalData[]> {
-    await connectDB();
-
     try {
+        await connectDB();
+
+        // Note: This function doesn't require authentication as it's used for calculations
         // Select only necessary fields: _id, price and branches (containing inStock)
         // Mongoose lean() returns plain objects, Map becomes Record
         const products = await Product.find({}, { _id: 1, price: 1, branches: 1 }).lean();
@@ -102,7 +103,8 @@ export async function getAllProductsForCapital(): Promise<ProductCapitalData[]> 
         return products as ProductCapitalData[];
     } catch (error) {
         console.error("Error fetching products for capital calculation:", error);
-        throw new Error("Failed to fetch product data for capital.");
+        // During build/prerender, return empty array instead of throwing
+        return [];
     }
 }
 

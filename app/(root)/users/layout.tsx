@@ -2,6 +2,9 @@ import { getQueryClient } from "@/lib/get-query-client";
 import { getUsers } from "@/lib/actions/user-actions";
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 
+// Force dynamic rendering for authenticated routes
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
     title: 'Users Management',
     description: 'Manage users, view their orders and appointments, and send notifications.',

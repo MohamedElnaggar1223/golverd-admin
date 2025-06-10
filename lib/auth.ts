@@ -177,7 +177,7 @@ export async function createInitialSuperUser() {
 
 export async function getCurrentUser() {
     try {
-        const session = await getServerSession(authOptions);
+        const session = await getSession(); // Use our wrapped getSession instead
 
         if (!session?.user?.email) {
             return null;
@@ -221,7 +221,13 @@ export async function getCurrentUser() {
             isBusinessOwner: currentUser.isBusinessOwner,
             isActive: currentUser.isActive,
         };
-    } catch (error) {
+    } catch (error: any) {
+        // During static rendering, return null instead of throwing
+        if (error?.digest === 'DYNAMIC_SERVER_USAGE' ||
+            error?.message?.includes('headers') ||
+            error?.message?.includes('Dynamic server usage')) {
+            return null;
+        }
         console.error("Error getting current user:", error);
         return null;
     }
@@ -229,5 +235,16 @@ export async function getCurrentUser() {
 
 // Simple server action to get session data without additional DB queries
 export async function getSession() {
-    return await getServerSession(authOptions);
+    try {
+        return await getServerSession(authOptions);
+    } catch (error: any) {
+        // During static rendering, getServerSession tries to access headers which fails
+        // Return null during build/static generation
+        if (error?.digest === 'DYNAMIC_SERVER_USAGE' ||
+            error?.message?.includes('headers') ||
+            error?.message?.includes('Dynamic server usage')) {
+            return null;
+        }
+        throw error;
+    }
 } 

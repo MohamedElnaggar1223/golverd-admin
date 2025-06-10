@@ -4,6 +4,9 @@ import { getAppointments } from "@/lib/actions/appointment-actions";
 import { getVendors } from "@/lib/actions/vendor-actions";
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 
+// Force dynamic rendering for authenticated routes
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
     title: "Orders & Appointments | Golverd Admin",
     description: "Manage orders, appointments, and view analytics",

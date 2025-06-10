@@ -18,7 +18,11 @@ export async function getVendors() {
             .lean();
 
         return vendors;
-    } catch (error) {
+    } catch (error: any) {
+        // During build/prerender, return empty array instead of throwing
+        if (error.name === 'AuthenticationError') {
+            return [];
+        }
         console.error('Error fetching vendors:', error);
         return [];
     }
@@ -36,7 +40,11 @@ export async function getVendorById(vendorId: string) {
         }
 
         return vendor;
-    } catch (error) {
+    } catch (error: any) {
+        // During build/prerender, return null instead of throwing
+        if (error.name === 'AuthenticationError') {
+            return null;
+        }
         console.error(`Error fetching vendor ${vendorId}:`, error);
         throw new Error("Failed to fetch vendor");
     }

@@ -4,6 +4,9 @@ import { getPositions } from "@/lib/actions/team-actions";
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { getVendors } from "@/lib/actions/vendor-actions";
 
+// Force dynamic rendering for authenticated routes
+export const dynamic = 'force-dynamic';
+
 export default function TeamLayout({
     children,
 }: {

@@ -36,7 +36,11 @@ export async function getBills() {
             ...bill,
             vendor: vendorMap[bill.vendorId] || null
         }));
-    } catch (error) {
+    } catch (error: any) {
+        // During build/prerender, return empty array instead of throwing
+        if (error.name === 'AuthenticationError') {
+            return [];
+        }
         console.error("Error fetching bills:", error);
         throw new Error("Failed to fetch bills");
     }
@@ -61,7 +65,11 @@ export async function getVendorBills(vendorId: string) {
             ...bill,
             vendor
         }));
-    } catch (error) {
+    } catch (error: any) {
+        // During build/prerender, return empty array instead of throwing
+        if (error.name === 'AuthenticationError') {
+            return [];
+        }
         console.error(`Error fetching bills for vendor ${vendorId}:`, error);
         throw new Error("Failed to fetch vendor bills");
     }

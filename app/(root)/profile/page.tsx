@@ -1,6 +1,9 @@
 import { getCurrentUser } from "@/lib/auth";
 import { ProfileEdit } from "./components/profile-edit";
 
+// Force dynamic rendering for authenticated routes
+export const dynamic = 'force-dynamic';
+
 export default async function ProfilePage() {
     const user = await getCurrentUser();
 

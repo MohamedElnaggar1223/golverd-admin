@@ -9,17 +9,25 @@ import { PERMISSION_KEYS } from '../permissions';
  * Get all orders
  */
 export async function getOrders() {
-    await connectDB();
+    try {
+        await connectDB();
 
-    await requirePermission([PERMISSION_KEYS.VIEW_ORDERS, PERMISSION_KEYS.VIEW_ALL]);
+        await requirePermission([PERMISSION_KEYS.VIEW_ORDERS, PERMISSION_KEYS.VIEW_ALL]);
 
-    const orders = await Order.find({})
-        .sort({ orderDate: -1 })
-        .populate('vendorID', 'name')
-        .populate('clientID', 'createdAt')
-        .lean();
+        const orders = await Order.find({})
+            .sort({ orderDate: -1 })
+            .populate('vendorID', 'name')
+            .populate('clientID', 'createdAt')
+            .lean();
 
-    return orders;
+        return orders;
+    } catch (error: any) {
+        // During build/prerender, return empty array instead of throwing
+        if (error.name === 'AuthenticationError') {
+            return [];
+        }
+        throw error;
+    }
 }
 
 /**

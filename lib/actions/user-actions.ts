@@ -16,18 +16,26 @@ import { PERMISSION_KEYS } from '../permissions';
  * This function fetches all users at once for client-side filtering/pagination
  */
 export async function getUsers() {
-    await connectDB();
+    try {
+        await connectDB();
 
-    await requirePermission([PERMISSION_KEYS.VIEW_USERS, PERMISSION_KEYS.VIEW_ALL]);
+        await requirePermission([PERMISSION_KEYS.VIEW_USERS, PERMISSION_KEYS.VIEW_ALL]);
 
-    // Fetch all users for client-side processing
-    const users = await User.find({})
-        .sort({ createdAt: -1 })
-        .lean();
+        // Fetch all users for client-side processing
+        const users = await User.find({})
+            .sort({ createdAt: -1 })
+            .lean();
 
-    console.log(users)
+        console.log(users)
 
-    return users;
+        return users;
+    } catch (error: any) {
+        // During build/prerender, return empty array instead of throwing
+        if (error.name === 'AuthenticationError') {
+            return [];
+        }
+        throw error;
+    }
 }
 
 /**

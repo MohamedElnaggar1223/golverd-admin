@@ -12,6 +12,9 @@ import { getOrders } from '@/lib/actions/order-actions'; // Assumed action
 import { getAppointments } from '@/lib/actions/appointment-actions'; // Assumed action
 import { getUsers } from '@/lib/actions/user-actions';
 
+// Force dynamic rendering for authenticated routes
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
 	title: 'Dashboard | Golverd Admin',
 	description: 'Overview of application statistics.',

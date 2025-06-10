@@ -17,8 +17,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
         });
 
         return {
-            title: `${vendorData.name} - Finance | Golverd Admin`,
-            description: `Financial management for ${vendorData.name}`
+            title: `${vendorData?.name} - Finance | Golverd Admin`,
+            description: `Financial management for ${vendorData?.name}`
         };
     } catch (error) {
         return {

@@ -9,33 +9,49 @@ import { requirePermission } from '../auth-guards';
  * Get all appointments
  */
 export async function getAppointments() {
-    await connectDB();
+    try {
+        await connectDB();
 
-    await requirePermission([PERMISSION_KEYS.VIEW_APPOINTMENTS, PERMISSION_KEYS.VIEW_ALL]);
+        await requirePermission([PERMISSION_KEYS.VIEW_APPOINTMENTS, PERMISSION_KEYS.VIEW_ALL]);
 
-    const appointments = await Appointment.find({})
-        .sort({ date: -1 })
-        .lean();
+        const appointments = await Appointment.find({})
+            .sort({ date: -1 })
+            .lean();
 
-    return appointments;
+        return appointments;
+    } catch (error: any) {
+        // During build/prerender, return empty array instead of throwing
+        if (error.name === 'AuthenticationError') {
+            return [];
+        }
+        throw error;
+    }
 }
 
 /**
  * Get appointment by ID
  */
 export async function getAppointmentById(appointmentId: string) {
-    await connectDB();
+    try {
+        await connectDB();
 
-    await requirePermission([PERMISSION_KEYS.VIEW_APPOINTMENTS, PERMISSION_KEYS.VIEW_ALL]);
+        await requirePermission([PERMISSION_KEYS.VIEW_APPOINTMENTS, PERMISSION_KEYS.VIEW_ALL]);
 
-    const appointment = await Appointment.findById(appointmentId)
-        .lean();
+        const appointment = await Appointment.findById(appointmentId)
+            .lean();
 
-    if (!appointment) {
-        throw new Error('Appointment not found');
+        if (!appointment) {
+            throw new Error('Appointment not found');
+        }
+
+        return appointment;
+    } catch (error: any) {
+        // During build/prerender, return null instead of throwing
+        if (error.name === 'AuthenticationError') {
+            return null;
+        }
+        throw error;
     }
-
-    return appointment;
 }
 
 /**
