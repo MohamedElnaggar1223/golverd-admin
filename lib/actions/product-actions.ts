@@ -182,13 +182,13 @@ export async function deleteProductImage(productId: string, imageUrl: string) {
 }
 
 /**
- * Get top viewed products for dashboard
+ * Get top viewed products for dashboard with vendor information
  */
-export async function getTopViewedProducts(limit: number = 5) {
+export async function getTopViewedProductsWithVendor(limit: number = 5) {
     try {
         await connectDB();
 
-        // Get top viewed products with necessary fields
+        // Get top viewed products with vendor information
         const products = await Product.find(
             { totalViews: { $gt: 0 } }, // Only products with views
             {
@@ -199,13 +199,14 @@ export async function getTopViewedProducts(limit: number = 5) {
                 brandDocID: 1
             }
         )
+            .populate('brandDocID', 'name') // Populate vendor name
             .sort({ totalViews: -1 }) // Sort by views descending
             .limit(limit)
             .lean();
 
         return products;
     } catch (error) {
-        console.error("Error fetching top viewed products:", error);
+        console.error("Error fetching top viewed products with vendor:", error);
         // During build/prerender, return empty array instead of throwing
         return [];
     }

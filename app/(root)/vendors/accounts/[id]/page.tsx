@@ -162,7 +162,7 @@ export default function VendorDetailsPage({ params }: { params: Promise<{ id: st
                 </TabsContent>
 
                 <TabsContent value="virtual-store">
-                    <EmbeddedVirtualStore />
+                    <EmbeddedVirtualStore vendorUid={id} />
                 </TabsContent>
 
                 <TabsContent value="analytics">

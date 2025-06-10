@@ -7,10 +7,11 @@ import HomeDashboard from './components/home-dashboard'; // Client component
 import { getBills } from '@/lib/actions/bill-actions';
 import { getVendors } from '@/lib/actions/vendor-actions';
 // Use the new action for products
-import { getAllProductsForCapital } from '@/lib/actions/product-actions';
+import { getAllProductsForCapital, getTopViewedProductsWithVendor } from '@/lib/actions/product-actions';
 import { getOrders } from '@/lib/actions/order-actions'; // Assumed action
 import { getAppointments } from '@/lib/actions/appointment-actions'; // Assumed action
 import { getUsers } from '@/lib/actions/user-actions';
+import { getShopVisits } from '@/lib/actions/shop-visit-actions';
 
 // Force dynamic rendering for authenticated routes
 export const dynamic = 'force-dynamic';
@@ -30,6 +31,19 @@ export default function HomePage() {
 	void queryClient.prefetchQuery({ queryKey: ['orders'], queryFn: getOrders });
 	void queryClient.prefetchQuery({ queryKey: ['appointments'], queryFn: getAppointments });
 	void queryClient.prefetchQuery({ queryKey: ['users'], queryFn: getUsers });
+	void queryClient.prefetchQuery({
+		queryKey: ['topViewedProducts'],
+		queryFn: async () => {
+			return getTopViewedProductsWithVendor(5);
+		}
+	});
+	void queryClient.prefetchQuery({
+		queryKey: ['shopVisits'],
+		queryFn: async () => {
+			return getShopVisits();
+		}
+	});
+
 
 	return (
 		<HydrationBoundary state={dehydrate(queryClient)}>

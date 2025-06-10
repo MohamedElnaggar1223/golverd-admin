@@ -13,10 +13,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 // Import actions & utils
 import { getBills } from '@/lib/actions/bill-actions';
 import { getVendors } from '@/lib/actions/vendor-actions';
-import { getAllProductsForCapital } from '@/lib/actions/product-actions'; // Use specific action
+import { getAllProductsForCapital, getTopViewedProductsWithVendor } from '@/lib/actions/product-actions'; // Use specific action
 import { getOrders } from '@/lib/actions/order-actions'; // Assumed
 import { getAppointments } from '@/lib/actions/appointment-actions'; // Assumed
 import { getUsers } from '@/lib/actions/user-actions';
+import { getShopVisits } from '@/lib/actions/shop-visit-actions';
 import { getVendorCategory } from '@/lib/vendor-utils';
 import { formatCurrency, calculatePercentageChange, formatDate } from '@/lib/utils';
 import { IProduct } from '@/models/Product'; // Assuming Product model interface
@@ -298,6 +299,88 @@ function DemographicPieCard({ title, data }: {
     );
 }
 
+// Top Viewed Products Card
+function TopViewedProductsCard({ title, products }: {
+    title: string;
+    products: any[];
+}) {
+    return (
+        <Card className="col-span-1 md:col-span-2 xl:col-span-1">
+            <CardHeader>
+                <CardTitle className="text-lg font-medium text-gray-700">{title}</CardTitle>
+                <p className="text-xs text-muted-foreground">Top 5 most viewed products</p>
+            </CardHeader>
+            <CardContent>
+                <div className="space-y-3">
+                    {products.length === 0 ? (
+                        <div className="text-center text-gray-500 py-8">
+                            No viewed products found
+                        </div>
+                    ) : (
+                        products.map((product, index) => (
+                            <div key={product._id} className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50">
+                                <div className="flex-shrink-0 w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center">
+                                    {product.images && product.images.length > 0 ? (
+                                        <Image
+                                            src={product.images[0]}
+                                            alt={product.name || 'Product'}
+                                            width={32}
+                                            height={32}
+                                            className="w-8 h-8 object-cover rounded-lg"
+                                        />
+                                    ) : (
+                                        <div className="w-8 h-8 bg-gray-300 rounded-lg flex items-center justify-center text-gray-500 text-xs">
+                                            No Img
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-gray-900 truncate">
+                                        {product.name || 'Unnamed Product'}
+                                    </p>
+                                    <p className="text-xs text-gray-500 truncate">
+                                        {product.brandDocID?.name || 'Unknown Vendor'}
+                                    </p>
+                                </div>
+                                <div className="flex-shrink-0">
+                                    <span className="text-xs font-medium text-gray-600">
+                                        {product.totalViews} views
+                                    </span>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+// Metric Card for simple numbers like shop visits and return rate
+function MetricCard({ title, value, subtitle, icon }: {
+    title: string;
+    value: string | number;
+    subtitle?: string;
+    icon?: React.ReactNode;
+}) {
+    return (
+        <Card className="col-span-1">
+            <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-medium text-gray-500">{title}</CardTitle>
+                    {icon && <div className="text-gray-400">{icon}</div>}
+                </div>
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-bold text-gray-900">{value}</div>
+                {subtitle && (
+                    <p className="text-xs text-gray-500 mt-1">{subtitle}</p>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
 // --- Main Dashboard Component --- 
 export default function HomeDashboard() {
     const router = useRouter();
@@ -324,6 +407,21 @@ export default function HomeDashboard() {
     const { data: ordersData = [] } = useSuspenseQuery<any[]>({ queryKey: ['orders'], queryFn: getOrders });  // Use any[]
     const { data: appointmentsData = [] } = useSuspenseQuery<any[]>({ queryKey: ['appointments'], queryFn: getAppointments }); // Use any[]
     const { data: usersData = [] } = useSuspenseQuery<any[]>({ queryKey: ['users'], queryFn: getUsers }); // Use any[]
+    const { data: topViewedProductsData = [] } = useSuspenseQuery<any[]>({
+        queryKey: ['topViewedProducts'],
+        queryFn: async () => {
+            const { getTopViewedProductsWithVendor } = await import('@/lib/actions/product-actions');
+            return getTopViewedProductsWithVendor(5);
+        }
+    });
+    const { data: shopVisitsData = 0 } = useSuspenseQuery<number>({
+        queryKey: ['shopVisits'],
+        queryFn: async () => {
+            const { getShopVisits } = await import('@/lib/actions/shop-visit-actions');
+            return getShopVisits();
+        }
+    });
+
 
     // Ensure data are arrays before processing
     const bills: IBill[] = Array.isArray(billsData) ? billsData : [];
@@ -332,6 +430,16 @@ export default function HomeDashboard() {
     const orders: IOrder[] = Array.isArray(ordersData) ? ordersData : []; // Cast back
     const appointments: IAppointment[] = Array.isArray(appointmentsData) ? appointmentsData : []; // Cast back
     const users: IUser[] = Array.isArray(usersData) ? usersData : []; // Cast back
+    const topViewedProducts: any[] = Array.isArray(topViewedProductsData) ? topViewedProductsData : [];
+    const shopVisits: number = typeof shopVisitsData === 'number' ? shopVisitsData : 0;
+
+    // Calculate return rate from existing orders data
+    const returnRate: number = useMemo(() => {
+        if (orders.length === 0) return 0;
+        const returnedOrders = orders.filter(order => order.status === 'returned').length;
+        const rate = (returnedOrders / orders.length) * 100;
+        return Math.round(rate * 100) / 100; // Round to 2 decimal places
+    }, [orders]);
 
     // --- Data Processing (Add explicit casts and checks inside) --- 
     const processedData = useMemo(() => {
@@ -1046,14 +1154,41 @@ export default function HomeDashboard() {
                             title="Customer Demographics"
                             data={processedData.demographicsData}
                         />
+                        <TopViewedProductsCard
+                            title="Top Viewed Products"
+                            products={topViewedProducts}
+                        />
+                        <MetricCard
+                            title="Shop Visits"
+                            value={shopVisits.toLocaleString()}
+                            subtitle="Total website visits"
+                        />
+                        <MetricCard
+                            title="Return Rate"
+                            value={`${returnRate}%`}
+                            subtitle="Percentage of returned orders"
+                        />
                     </div>
                 </TabsContent>
 
                 {/* --- Interactions & Views Tab --- */}
                 <TabsContent value="interactions" className="mt-0 w-full">
                     <YearSelector />
-                    <div className="p-6 border rounded bg-white shadow-sm text-center text-gray-500">
-                        Interactions & Views analytics will be available in a future update.
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <TopViewedProductsCard
+                            title="Top Viewed Products"
+                            products={topViewedProducts}
+                        />
+                        <MetricCard
+                            title="Shop Visits"
+                            value={shopVisits.toLocaleString()}
+                            subtitle="Total website visits"
+                        />
+                        <MetricCard
+                            title="Return Rate"
+                            value={`${returnRate}%`}
+                            subtitle="Percentage of returned orders"
+                        />
                     </div>
                 </TabsContent>
 
