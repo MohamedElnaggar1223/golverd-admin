@@ -237,7 +237,7 @@ export function NewTeamMemberTab() {
                                                 <PhoneInput
                                                     defaultCountry="EG"
                                                     international
-                                                    withCountryCallingCode
+                                                    // withCountryCallingCode
                                                     value={field.value}
                                                     onChange={field.onChange}
                                                     className="rounded-[4px] px-4 py-5 bg-[#E8E4E1] border border-[#44312D]"
