@@ -7,6 +7,8 @@ import Order from "@/models/Order";
 import { IBill } from "@/models/Bill";
 import { v4 as uuidv4 } from "uuid";
 import { getOrdersByVendorId } from "./order-actions";
+import { requirePermission } from "../auth-guards";
+import { PERMISSION_KEYS } from "../permissions";
 
 /**
  * Get all bills with populated vendor information
@@ -14,6 +16,8 @@ import { getOrdersByVendorId } from "./order-actions";
 export async function getBills() {
     try {
         await connectDB();
+
+        await requirePermission([PERMISSION_KEYS.VIEW_FINANCIAL_CENTER, PERMISSION_KEYS.VIEW_ALL]);
 
         const bills = await Bill.find()
             .sort({ createdAt: -1 })
@@ -45,6 +49,8 @@ export async function getVendorBills(vendorId: string) {
     try {
         await connectDB();
 
+        await requirePermission([PERMISSION_KEYS.VIEW_FINANCIAL_CENTER, PERMISSION_KEYS.VIEW_ALL]);
+
         const bills = await Bill.find({ vendorId })
             .sort({ createdAt: -1 })
             .lean();
@@ -67,6 +73,8 @@ export async function getVendorBills(vendorId: string) {
 export async function createBill(data: Partial<IBill>) {
     try {
         await connectDB();
+
+        await requirePermission([PERMISSION_KEYS.EDIT_FINANCIAL_CENTER, PERMISSION_KEYS.EDIT_ALL]);
 
         const vendor = await Vendor.findById(data.vendorId).lean();
         if (!vendor) {
@@ -98,6 +106,8 @@ export async function updateBill(billId: string, data: Partial<IBill>) {
     try {
         await connectDB();
 
+        await requirePermission([PERMISSION_KEYS.EDIT_FINANCIAL_CENTER, PERMISSION_KEYS.EDIT_ALL]);
+
         const bill = await Bill.findById(billId);
         if (!bill) {
             throw new Error("Bill not found");
@@ -123,6 +133,8 @@ export async function deleteBill(billId: string) {
     try {
         await connectDB();
 
+        await requirePermission([PERMISSION_KEYS.EDIT_FINANCIAL_CENTER, PERMISSION_KEYS.EDIT_ALL]);
+
         await Bill.findByIdAndDelete(billId);
         return { success: true };
     } catch (error) {
@@ -134,9 +146,14 @@ export async function deleteBill(billId: string) {
 /**
  * Generate bills for all vendors for the current month
  */
-export async function generateMonthlyBills() {
+export async function generateMonthlyBills(skipPermissionCheck = false) {
     try {
         await connectDB();
+
+        // Skip permission check for system/cron calls
+        if (!skipPermissionCheck) {
+            await requirePermission([PERMISSION_KEYS.EDIT_FINANCIAL_CENTER, PERMISSION_KEYS.EDIT_ALL]);
+        }
 
         const currentDate = new Date();
         const currentMonth = currentDate.getMonth() + 1; // JS months are 0-indexed

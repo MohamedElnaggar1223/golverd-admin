@@ -3,16 +3,14 @@
 import { connectDB } from '@/lib/mongoose';
 import Vendor from '@/models/Vendor';
 import { getSession } from '@/lib/auth';
+import { requirePermission } from '../auth-guards';
+import { PERMISSION_KEYS } from '../permissions';
 
 export async function getVendors() {
     try {
         await connectDB();
 
-        // Authentication check
-        const session = await getSession();
-        if (!session?.user) {
-            throw new Error('Not authenticated');
-        }
+        await requirePermission([PERMISSION_KEYS.VIEW_VENDORS, PERMISSION_KEYS.VIEW_ALL]);
 
         // Get all vendors in one query
         const vendors = await Vendor.find()
@@ -30,6 +28,8 @@ export async function getVendorById(vendorId: string) {
     try {
         await connectDB();
 
+        await requirePermission([PERMISSION_KEYS.VIEW_VENDORS, PERMISSION_KEYS.VIEW_ALL]);
+
         const vendor = await Vendor.findById(vendorId).lean();
         if (!vendor) {
             throw new Error("Vendor not found");
@@ -46,11 +46,7 @@ export async function approveVendor(id: string, data: { rent: number, commission
     try {
         await connectDB();
 
-        // Authentication check
-        const session = await getSession();
-        if (!session?.user) {
-            throw new Error('Not authenticated');
-        }
+        await requirePermission([PERMISSION_KEYS.EDIT_VENDORS, PERMISSION_KEYS.EDIT_ALL]);
 
         const vendor = await Vendor.findByIdAndUpdate(
             id,
@@ -78,11 +74,7 @@ export async function rejectVendor(id: string) {
     try {
         await connectDB();
 
-        // Authentication check
-        const session = await getSession();
-        if (!session?.user) {
-            throw new Error('Not authenticated');
-        }
+        await requirePermission([PERMISSION_KEYS.EDIT_VENDORS, PERMISSION_KEYS.EDIT_ALL]);
 
         const vendor = await Vendor.findByIdAndUpdate(
             id,
@@ -105,11 +97,7 @@ export async function freezeVendorAccount(id: string) {
     try {
         await connectDB();
 
-        // Authentication check
-        const session = await getSession();
-        if (!session?.user) {
-            throw new Error('Not authenticated');
-        }
+        await requirePermission([PERMISSION_KEYS.EDIT_VENDORS, PERMISSION_KEYS.EDIT_ALL]);
 
         const vendor = await Vendor.findByIdAndUpdate(
             id,
@@ -144,11 +132,7 @@ export async function deleteVendorAccount(id: string) {
     try {
         await connectDB();
 
-        // Authentication check
-        const session = await getSession();
-        if (!session?.user) {
-            throw new Error('Not authenticated');
-        }
+        await requirePermission([PERMISSION_KEYS.EDIT_VENDORS, PERMISSION_KEYS.EDIT_ALL]);
 
         const result = await Vendor.findByIdAndDelete(id);
 

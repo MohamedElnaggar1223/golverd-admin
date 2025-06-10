@@ -2,12 +2,16 @@
 
 import { connectDB } from '@/lib/mongoose';
 import Order from '@/models/Order';
+import { requirePermission } from '../auth-guards';
+import { PERMISSION_KEYS } from '../permissions';
 
 /**
  * Get all orders
  */
 export async function getOrders() {
     await connectDB();
+
+    await requirePermission([PERMISSION_KEYS.VIEW_ORDERS, PERMISSION_KEYS.VIEW_ALL]);
 
     const orders = await Order.find({})
         .sort({ orderDate: -1 })
@@ -23,6 +27,8 @@ export async function getOrders() {
  */
 export async function getOrderById(orderId: string) {
     await connectDB();
+
+    await requirePermission([PERMISSION_KEYS.VIEW_ORDERS, PERMISSION_KEYS.VIEW_ALL]);
 
     const order = await Order.findById(orderId)
         .populate('vendorID', 'name')
@@ -41,6 +47,8 @@ export async function getOrderById(orderId: string) {
 export async function getOrdersByVendorId(vendorId: string) {
     await connectDB();
 
+    await requirePermission([PERMISSION_KEYS.VIEW_ORDERS, PERMISSION_KEYS.VIEW_ALL]);
+
     const orders = await Order.find({ vendorID: vendorId })
         .sort({ orderDate: -1 })
         .lean();
@@ -53,6 +61,8 @@ export async function getOrdersByVendorId(vendorId: string) {
  */
 export async function getOrdersByClientId(clientId: string) {
     await connectDB();
+
+    await requirePermission([PERMISSION_KEYS.VIEW_ORDERS, PERMISSION_KEYS.VIEW_ALL]);
 
     const orders = await Order.find({ clientID: clientId })
         .sort({ orderDate: -1 })

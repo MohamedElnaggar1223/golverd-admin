@@ -7,17 +7,22 @@ import { randomUUID } from 'crypto';
 import { revalidatePath } from 'next/cache';
 import { getSession } from '@/lib/auth';
 import { uploadToCloudinary } from '@/lib/utils/upload';
+import {
+    requireAuth,
+    requirePermission,
+    requireBusinessOwner,
+    requireViewAccess,
+    requireEditAccess
+} from '@/lib/auth-guards';
+import { PERMISSION_KEYS } from '@/lib/permissions';
 
 // Position management
 export async function getPositions() {
     try {
         await connectDB();
 
-        // Authentication check
-        const session = await getSession();
-        if (!session?.user) {
-            throw new Error('Not authenticated');
-        }
+        // Require team management view access
+        await requireViewAccess('/team');
 
         const positions = await Position.find().sort({ name: 1 }).lean();
         return positions;
@@ -51,17 +56,8 @@ export async function createPosition(data: {
     try {
         await connectDB();
 
-        // Authentication check
-        const session = await getSession();
-        if (!session?.user) {
-            throw new Error('Not authenticated');
-        }
-
-        // Check if user is business owner
-        const currentUser = await SuperUser.findById(session.user.id);
-        if (!currentUser?.isBusinessOwner) {
-            throw new Error('Unauthorized');
-        }
+        // Only business owners can create positions
+        await requireBusinessOwner();
 
         const position = new Position({
             _id: randomUUID(),
@@ -165,11 +161,8 @@ export async function getTeamMembers() {
     try {
         await connectDB();
 
-        // Authentication check
-        const session = await getSession();
-        if (!session?.user) {
-            throw new Error('Not authenticated');
-        }
+        // Require team management view access
+        await requireViewAccess('/team');
 
         const teamMembers = await SuperUser.find({ isActive: true })
             .populate('position')

@@ -8,6 +8,8 @@ import Order from '@/models/Order';
 import Notification from '@/models/Notification';
 import { sendNotification, updateUnreadCount } from './notifications-actions';
 import { OrderItem } from '../types/orders.types';
+import { requirePermission } from '../auth-guards';
+import { PERMISSION_KEYS } from '../permissions';
 
 /**
  * Get all users 
@@ -15,6 +17,8 @@ import { OrderItem } from '../types/orders.types';
  */
 export async function getUsers() {
     await connectDB();
+
+    await requirePermission([PERMISSION_KEYS.VIEW_USERS, PERMISSION_KEYS.VIEW_ALL]);
 
     // Fetch all users for client-side processing
     const users = await User.find({})
@@ -32,6 +36,8 @@ export async function getUsers() {
 export async function getUserOrders(userId: string) {
     await connectDB();
 
+    await requirePermission([PERMISSION_KEYS.VIEW_USERS, PERMISSION_KEYS.VIEW_ALL]);
+
     // Fetch all orders for this user
     const orders = await Order.find({ clientID: userId })
         .sort({ orderDate: -1 })
@@ -47,6 +53,8 @@ export async function getUserOrders(userId: string) {
 export async function getUserAppointments(userId: string) {
     await connectDB();
 
+    await requirePermission([PERMISSION_KEYS.VIEW_USERS, PERMISSION_KEYS.VIEW_ALL]);
+
     // Fetch all appointments for this user
     const appointments = await Appointment.find({ userId: userId })
         .sort({ date: -1 })
@@ -60,6 +68,8 @@ export async function getUserAppointments(userId: string) {
  */
 export async function deleteUser(userId: string) {
     await connectDB();
+
+    await requirePermission([PERMISSION_KEYS.VIEW_USERS, PERMISSION_KEYS.VIEW_ALL]); // Only users with view users can delete
 
     await User.findByIdAndDelete(userId);
 
@@ -168,6 +178,8 @@ export async function sendUserNotification(data: {
     sendToAll: boolean;
 }) {
     await connectDB();
+
+    await requirePermission([PERMISSION_KEYS.VIEW_USERS, PERMISSION_KEYS.VIEW_ALL]); // Only users with view users can send notifications
 
     const { title, message, userId, sendToAll } = data;
 

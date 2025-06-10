@@ -1,11 +1,13 @@
 import { connectDB } from "@/lib/mongoose";
 import SuperUser from "@/models/SuperUser";
+import Position from "@/models/Position";
 import { compare } from "bcrypt";
 import { randomUUID } from "crypto";
 import { NextAuthOptions, User, getServerSession } from "next-auth";
 import { AdapterUser } from "next-auth/adapters";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { Session } from "next-auth";
+import { UserPermissions, createDefaultPermissions, createBusinessOwnerPermissions } from "@/lib/permissions";
 
 // Extend the built-in types
 declare module "next-auth" {
@@ -14,6 +16,8 @@ declare module "next-auth" {
         role: string;
         isActive: boolean;
         isBusinessOwner: boolean;
+        permissions: UserPermissions;
+        positionId?: string;
     }
 
     interface Session {
@@ -24,6 +28,8 @@ declare module "next-auth" {
             role: string;
             isActive: boolean;
             isBusinessOwner: boolean;
+            permissions: UserPermissions;
+            positionId?: string;
         }
     }
 }
@@ -34,6 +40,8 @@ declare module "next-auth/jwt" {
         role: string;
         isActive: boolean;
         isBusinessOwner: boolean;
+        permissions: UserPermissions;
+        positionId?: string;
     }
 }
 
@@ -52,7 +60,7 @@ export const authOptions: NextAuthOptions = {
 
                 await connectDB();
 
-                const user = await SuperUser.findByEmail(credentials.email);
+                const user = await SuperUser.findOne({ email: credentials.email }).populate('position');
 
                 if (!user || !user.isActive) {
                     return null;
@@ -68,7 +76,28 @@ export const authOptions: NextAuthOptions = {
                 user.lastLogin = new Date();
                 await user.save();
 
+                // Get user permissions
+                let permissions: UserPermissions;
+
+                if (user.isBusinessOwner) {
+                    // Business owners get all permissions
+                    permissions = createBusinessOwnerPermissions();
+                } else if (user.positionId) {
+                    // Get permissions from position
+                    const position = await Position.findById(user.positionId);
+                    if (position) {
+                        permissions = position.permissions as UserPermissions;
+                    } else {
+                        // Fallback to default permissions if position not found
+                        permissions = createDefaultPermissions();
+                    }
+                } else {
+                    // No position assigned, use default permissions
+                    permissions = createDefaultPermissions();
+                }
+
                 console.log("User: ", user);
+                console.log("Permissions: ", permissions);
 
                 return {
                     id: user._id,
@@ -76,7 +105,9 @@ export const authOptions: NextAuthOptions = {
                     name: user.name,
                     role: user.role,
                     isActive: user.isActive,
-                    isBusinessOwner: user.isBusinessOwner
+                    isBusinessOwner: user.isBusinessOwner,
+                    permissions,
+                    positionId: user.positionId
                 };
             }
         })
@@ -90,6 +121,8 @@ export const authOptions: NextAuthOptions = {
                 token.role = user.role;
                 token.isActive = user.isActive;
                 token.isBusinessOwner = user.isBusinessOwner;
+                token.permissions = user.permissions;
+                token.positionId = user.positionId;
             }
             return token;
         },
@@ -101,6 +134,8 @@ export const authOptions: NextAuthOptions = {
                 session.user.role = token.role;
                 session.user.isActive = token.isActive;
                 session.user.isBusinessOwner = token.isBusinessOwner;
+                session.user.permissions = token.permissions;
+                session.user.positionId = token.positionId;
             }
             return session;
         }
@@ -150,10 +185,30 @@ export async function getCurrentUser() {
 
         await connectDB();
 
-        const currentUser = await SuperUser.findByEmail(session.user.email);
+        const currentUser = await SuperUser.findOne({ email: session.user.email }).populate('position');
 
         if (!currentUser || !currentUser.isActive) {
             return null;
+        }
+
+        // Get user permissions
+        let permissions: UserPermissions;
+
+        if (currentUser.isBusinessOwner) {
+            // Business owners get all permissions
+            permissions = createBusinessOwnerPermissions();
+        } else if (currentUser.positionId) {
+            // Get permissions from position
+            const position = await Position.findById(currentUser.positionId);
+            if (position) {
+                permissions = position.permissions as UserPermissions;
+            } else {
+                // Fallback to default permissions if position not found
+                permissions = createDefaultPermissions();
+            }
+        } else {
+            // No position assigned, use default permissions
+            permissions = createDefaultPermissions();
         }
 
         return {
@@ -161,6 +216,10 @@ export async function getCurrentUser() {
             email: currentUser.email,
             name: currentUser.name,
             role: currentUser.role,
+            permissions,
+            positionId: currentUser.positionId,
+            isBusinessOwner: currentUser.isBusinessOwner,
+            isActive: currentUser.isActive,
         };
     } catch (error) {
         console.error("Error getting current user:", error);

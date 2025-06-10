@@ -15,6 +15,7 @@ import { useDebounce } from "@/lib/hooks/use-debounce";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/shared/spinner";
 import { getQueryClient } from "@/lib/get-query-client";
+import { toast } from "sonner";
 export function AppointmentsTab() {
     const [searchQuery, setSearchQuery] = useState('');
     const [vendorFilter, setVendorFilter] = useState('all');
@@ -96,6 +97,10 @@ export function AppointmentsTab() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['appointments'] });
+            toast.success("Sale status updated successfully");
+        },
+        onError: (error: any) => {
+            toast.error(error.message || "Failed to update sale status. Please check your permissions.");
         }
     });
 

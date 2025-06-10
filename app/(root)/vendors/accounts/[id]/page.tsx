@@ -16,6 +16,7 @@ import { ArrowLeft, Star } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { getQueryClient } from "@/lib/get-query-client";
 import { Vendor } from "@/lib/types/vendors.types";
+import EmbeddedVirtualStore from "@/components/shared/EmbeddedVirtualStore";
 
 export default function VendorDetailsPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
@@ -131,6 +132,12 @@ export default function VendorDetailsPage({ params }: { params: Promise<{ id: st
                         Shop
                     </TabsTrigger>
                     <TabsTrigger
+                        value="virtual-store"
+                        className='data-[state=active]:bg-[#44312D] data-[state=active]:text-white rounded-sm py-1.5 px-4 w-fit'
+                    >
+                        Virtual Store
+                    </TabsTrigger>
+                    <TabsTrigger
                         value="analytics"
                         className='data-[state=active]:bg-[#44312D] data-[state=active]:text-white rounded-sm py-1.5 px-4 w-fit'
                     >
@@ -152,6 +159,10 @@ export default function VendorDetailsPage({ params }: { params: Promise<{ id: st
 
                 <TabsContent value="shop">
                     <VendorShopTab vendorId={id} />
+                </TabsContent>
+
+                <TabsContent value="virtual-store">
+                    <EmbeddedVirtualStore />
                 </TabsContent>
 
                 <TabsContent value="analytics">

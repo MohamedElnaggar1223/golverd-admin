@@ -2,12 +2,16 @@
 
 import { connectDB } from '@/lib/mongoose';
 import Appointment from '@/models/Appointment';
+import { PERMISSION_KEYS } from '../permissions';
+import { requirePermission } from '../auth-guards';
 
 /**
  * Get all appointments
  */
 export async function getAppointments() {
     await connectDB();
+
+    await requirePermission([PERMISSION_KEYS.VIEW_APPOINTMENTS, PERMISSION_KEYS.VIEW_ALL]);
 
     const appointments = await Appointment.find({})
         .sort({ date: -1 })
@@ -21,6 +25,8 @@ export async function getAppointments() {
  */
 export async function getAppointmentById(appointmentId: string) {
     await connectDB();
+
+    await requirePermission([PERMISSION_KEYS.VIEW_APPOINTMENTS, PERMISSION_KEYS.VIEW_ALL]);
 
     const appointment = await Appointment.findById(appointmentId)
         .lean();
@@ -38,6 +44,8 @@ export async function getAppointmentById(appointmentId: string) {
 export async function getAppointmentsByVendorId(vendorId: string) {
     await connectDB();
 
+    await requirePermission([PERMISSION_KEYS.VIEW_APPOINTMENTS, PERMISSION_KEYS.VIEW_ALL]);
+
     const appointments = await Appointment.find({ vendorId })
         .sort({ date: -1 })
         .lean();
@@ -51,6 +59,8 @@ export async function getAppointmentsByVendorId(vendorId: string) {
 export async function getAppointmentsByUserId(userId: string) {
     await connectDB();
 
+    await requirePermission([PERMISSION_KEYS.VIEW_APPOINTMENTS, PERMISSION_KEYS.VIEW_ALL]);
+
     const appointments = await Appointment.find({ userId })
         .sort({ date: -1 })
         .lean();
@@ -63,6 +73,8 @@ export async function getAppointmentsByUserId(userId: string) {
  */
 export async function getUpcomingAppointments() {
     await connectDB();
+
+    await requirePermission([PERMISSION_KEYS.VIEW_APPOINTMENTS, PERMISSION_KEYS.VIEW_ALL]);
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -82,6 +94,8 @@ export async function getUpcomingAppointments() {
 export async function getPastAppointments() {
     await connectDB();
 
+    await requirePermission([PERMISSION_KEYS.VIEW_APPOINTMENTS, PERMISSION_KEYS.VIEW_ALL]);
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -99,6 +113,8 @@ export async function getPastAppointments() {
  */
 export async function toggleAppointmentSaleStatus(appointmentId: string) {
     await connectDB();
+
+    await requirePermission(PERMISSION_KEYS.EDIT_APPOINTMENTS);
 
     const appointment = await Appointment.findById(appointmentId);
     if (!appointment) {
