@@ -1,27 +1,28 @@
 'use client';
 
-import { useState } from "react";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import React, { useState } from "react";
+import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getVendorBills, createBill, updateBill } from "@/lib/actions/bill-actions";
-import { getVendorById } from "@/lib/actions/vendor-actions";
+import { getVendorById, updateVendorRentAndCommission } from "@/lib/actions/vendor-actions";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { getVendorCategory } from "@/lib/vendor-utils";
 import { getQueryClient } from "@/lib/get-query-client";
 import { useNotifications } from "@/providers/notification-provider";
+import { useHasPermission } from "@/contexts/PermissionContext";
 import {
     Table, TableBody, TableCell, TableHead,
     TableHeader, TableRow
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { Bell, Plus, Edit, Calendar } from "lucide-react";
+import { Bell, Plus, Edit, Calendar, Edit2, Check, X } from "lucide-react";
 
 interface VendorFinanceDetailProps {
     vendorId: string;
@@ -65,6 +66,40 @@ export default function VendorFinanceDetail({
 
     // Access notification context
     const { notifications, unreadCount, markAsRead } = useNotifications();
+
+    // Permission check
+    const hasPermission = useHasPermission();
+    const canEdit = hasPermission('editVendors');
+
+    // Vendor settings state
+    const [editingRent, setEditingRent] = useState(false);
+    const [editingCommission, setEditingCommission] = useState(false);
+    const [rentValue, setRentValue] = useState('0');
+    const [commissionValue, setCommissionValue] = useState('0');
+
+    // Update state when vendor data changes
+    React.useEffect(() => {
+        if (vendor) {
+            setRentValue(vendor.rent?.toString() || '0');
+            setCommissionValue(vendor.commission?.toString() || '0');
+        }
+    }, [vendor]);
+
+    // Mutation for updating vendor rent and commission
+    const updateVendorMutation = useMutation({
+        mutationFn: (data: { rent: number, commission: number }) =>
+            updateVendorRentAndCommission(vendorId, data),
+        onSuccess: () => {
+            getQueryClient().invalidateQueries({ queryKey: ['vendor', vendorId] });
+            getQueryClient().invalidateQueries({ queryKey: ['vendors'] });
+            toast.success("Rent and commission updated successfully");
+            setEditingRent(false);
+            setEditingCommission(false);
+        },
+        onError: (error: any) => {
+            toast.error(error.message || "Failed to update rent and commission");
+        }
+    });
 
     // Function to invalidate and refresh data
     const refreshData = () => {
@@ -211,6 +246,41 @@ export default function VendorFinanceDetail({
         setIsEditBillDialogOpen(true);
     };
 
+    // Handle vendor settings
+    const handleSaveRent = () => {
+        const rent = parseFloat(rentValue);
+        const commission = vendor?.commission || 0;
+
+        if (isNaN(rent) || rent < 0) {
+            toast.error("Please enter a valid rent amount");
+            return;
+        }
+
+        updateVendorMutation.mutate({ rent, commission });
+    };
+
+    const handleSaveCommission = () => {
+        const commission = parseFloat(commissionValue);
+        const rent = vendor?.rent || 0;
+
+        if (isNaN(commission) || commission < 0) {
+            toast.error("Please enter a valid commission amount");
+            return;
+        }
+
+        updateVendorMutation.mutate({ rent, commission });
+    };
+
+    const handleCancelRent = () => {
+        setRentValue(vendor?.rent?.toString() || '0');
+        setEditingRent(false);
+    };
+
+    const handleCancelCommission = () => {
+        setCommissionValue(vendor?.commission?.toString() || '0');
+        setEditingCommission(false);
+    };
+
     return (
         <div className="py-6 px-6 space-y-6">
             {/* Vendor Header */}
@@ -262,36 +332,152 @@ export default function VendorFinanceDetail({
 
             {/* Vendor Financial Info */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Monthly Rent Card */}
                 <Card>
-                    <CardContent className="p-4">
-                        <div className="space-y-2">
-                            <h3 className="font-semibold">Monthly Rent</h3>
-                            <p className="text-2xl">{formatCurrency(vendor?.rent || 0)}</p>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-gray-500">Monthly Rent</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                        <div className="flex items-center gap-2">
+                            {editingRent ? (
+                                <div className="flex items-center gap-2 w-full">
+                                    <Input
+                                        type="number"
+                                        value={rentValue}
+                                        onChange={(e) => setRentValue(e.target.value)}
+                                        className="w-24 h-8 text-sm"
+                                        min="0"
+                                        step="0.01"
+                                    />
+                                    <span className="text-sm text-gray-500">EGP</span>
+                                    <Button
+                                        size="sm"
+                                        onClick={handleSaveRent}
+                                        disabled={updateVendorMutation.isPending}
+                                        className="h-8 w-8 p-0 bg-green-600 hover:bg-green-700"
+                                    >
+                                        <Check className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={handleCancelRent}
+                                        disabled={updateVendorMutation.isPending}
+                                        className="h-8 w-8 p-0"
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-2 w-full">
+                                    <span className="text-2xl font-bold">
+                                        {formatCurrency(vendor?.rent || 0)}
+                                    </span>
+                                    {canEdit && (
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => setEditingRent(true)}
+                                            className="h-8 w-8 p-0 hover:bg-gray-200 ml-auto"
+                                        >
+                                            <Edit2 className="h-4 w-4" />
+                                        </Button>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
+
+                {/* Commission Rate Card */}
                 <Card>
-                    <CardContent className="p-4">
-                        <div className="space-y-2">
-                            <h3 className="font-semibold">Commission Rate</h3>
-                            <p className="text-2xl">{vendor?.commission || 0}%</p>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-gray-500">Commission Rate</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                        <div className="flex items-center gap-2">
+                            {editingCommission ? (
+                                <div className="flex items-center gap-2 w-full">
+                                    <Input
+                                        type="number"
+                                        value={commissionValue}
+                                        onChange={(e) => setCommissionValue(e.target.value)}
+                                        className="w-24 h-8 text-sm"
+                                        min="0"
+                                        step="0.01"
+                                    />
+                                    <span className="text-sm text-gray-500">%</span>
+                                    <Button
+                                        size="sm"
+                                        onClick={handleSaveCommission}
+                                        disabled={updateVendorMutation.isPending}
+                                        className="h-8 w-8 p-0 bg-green-600 hover:bg-green-700"
+                                    >
+                                        <Check className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={handleCancelCommission}
+                                        disabled={updateVendorMutation.isPending}
+                                        className="h-8 w-8 p-0"
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-2 w-full">
+                                    <span className="text-2xl font-bold">
+                                        {vendor?.commission || 0}%
+                                    </span>
+                                    {canEdit && (
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => setEditingCommission(true)}
+                                            className="h-8 w-8 p-0 hover:bg-gray-200 ml-auto"
+                                        >
+                                            <Edit2 className="h-4 w-4" />
+                                        </Button>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
+
+                {/* Total Collected Card */}
                 <Card>
-                    <CardContent className="p-4">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-gray-500">Total Collected (This Month)</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
                         <div className="space-y-2">
-                            <h3 className="font-semibold">Total Collected</h3>
-                            <p className="text-2xl">
+                            <span className="text-2xl font-bold">
                                 {formatCurrency(
-                                    bills?.reduce((sum: number, bill: any) =>
-                                        bill.status === 'paid' ? sum + bill.totalAmount : sum, 0) || 0
+                                    bills?.reduce((sum: number, bill: any) => {
+                                        const currentMonth = new Date().getMonth() + 1;
+                                        const currentYear = new Date().getFullYear();
+                                        return (bill.status === 'paid' &&
+                                            bill.month === currentMonth &&
+                                            bill.year === currentYear)
+                                            ? sum + bill.totalAmount
+                                            : sum;
+                                    }, 0) || 0
                                 )}
-                            </p>
+                            </span>
                         </div>
                     </CardContent>
                 </Card>
             </div>
+
+            {!canEdit && (
+                <div className="text-center">
+                    <p className="text-xs text-gray-500">
+                        You don't have permission to edit vendor financial settings
+                    </p>
+                </div>
+            )}
 
             {/* Send Notification Dialog */}
             <Dialog open={isNotificationDialogOpen} onOpenChange={setIsNotificationDialogOpen}>

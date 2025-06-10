@@ -21,16 +21,16 @@ export async function GET(request: Request) {
     try {
         // Check if this is a legitimate request
         const cronSecret = request.headers.get('authorization');
-        const vercelCronHeader = request.headers.get('x-vercel-cron');
+        // const vercelCronHeader = request.headers.get('x-vercel-cron');
 
         // Vercel automatically adds 'x-vercel-cron: 1' header for cron jobs
         // For manual/external calls, we still support the authorization header
-        const isVercelCron = vercelCronHeader === '1';
+        // const isVercelCron = vercelCronHeader === '1';
         const isAuthorizedExternal = cronSecret === `Bearer ${process.env.CRON_SECRET}`;
 
-        console.log(`[Cron] Auth check - Vercel cron: ${isVercelCron}, External auth: ${isAuthorizedExternal}`);
+        console.log(`[Cron] Auth check - Vercel cron: ${isAuthorizedExternal}, External auth: ${isAuthorizedExternal}`);
 
-        if (!isVercelCron && !isAuthorizedExternal) {
+        if (!isAuthorizedExternal) {
             console.log('[Cron] Unauthorized access attempt');
             return NextResponse.json(
                 { error: "Unauthorized access" },
@@ -55,7 +55,7 @@ export async function GET(request: Request) {
         const result = await generateMonthlyBills(true);
 
         // Log the outcome for monitoring
-        const authSource = isVercelCron ? 'Vercel Cron' : 'External API';
+        const authSource = isAuthorizedExternal ? 'Vercel Cron' : 'External API';
         console.log(`[Cron] Bills generation completed via ${authSource}: Created ${result.created}, Skipped ${result.skipped}`);
 
         return NextResponse.json({

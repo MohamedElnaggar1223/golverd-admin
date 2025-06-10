@@ -153,4 +153,47 @@ export async function deleteVendorAccount(id: string) {
         console.error('Error deleting vendor account:', error);
         throw error;
     }
+}
+
+export async function updateVendorRentAndCommission(id: string, data: { rent: number, commission: number }) {
+    try {
+        await connectDB();
+
+        await requirePermission([PERMISSION_KEYS.EDIT_VENDORS, PERMISSION_KEYS.EDIT_ALL]);
+
+        // Validate the input data
+        if (typeof data.rent !== 'number' || data.rent < 0) {
+            throw new Error('Rent must be a non-negative number');
+        }
+        if (typeof data.commission !== 'number' || data.commission < 0) {
+            throw new Error('Commission must be a non-negative number');
+        }
+
+        const vendor = await Vendor.findByIdAndUpdate(
+            id,
+            {
+                rent: data.rent,
+                commission: data.commission,
+                updatedAt: new Date()
+            },
+            { new: true }
+        );
+
+        if (!vendor) {
+            throw new Error('Vendor not found');
+        }
+
+        return {
+            success: true,
+            message: 'Rent and commission updated successfully',
+            vendor: {
+                _id: vendor._id,
+                rent: vendor.rent,
+                commission: vendor.commission
+            }
+        };
+    } catch (error) {
+        console.error('Error updating vendor rent and commission:', error);
+        throw error;
+    }
 } 

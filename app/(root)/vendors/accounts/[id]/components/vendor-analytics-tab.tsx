@@ -243,6 +243,8 @@ function DemographicPieCard({ title, data }: {
     );
 }
 
+
+
 export function VendorAnalyticsTab({ vendorId }: VendorAnalyticsTabProps) {
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
     const [grossProfitTimePeriod, setGrossProfitTimePeriod] = useState<TimePeriod>('monthly');

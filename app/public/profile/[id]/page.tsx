@@ -14,6 +14,8 @@ export default function PublicProfile() {
     const [error, setError] = useState<string | null>(null);
     const params = useParams<{ id: string }>();
 
+    console.log(teamMember);
+
     useEffect(() => {
         const fetchTeamMember = async () => {
             try {
@@ -91,7 +93,7 @@ export default function PublicProfile() {
 
                     <div className="text-center">
                         <h2 className="text-2xl font-bold">{teamMember.name}</h2>
-                        <p className="text-lg text-gray-500">{teamMember.position?.name || 'Team Member'}</p>
+                        <p className="text-lg text-gray-500">{teamMember.positionId?.name || 'Team Member'}</p>
                     </div>
 
                     <div className="w-full max-w-md space-y-4">
@@ -103,11 +105,11 @@ export default function PublicProfile() {
                             )}
                         </div>
 
-                        {teamMember.position && (
+                        {teamMember.positionId && (
                             <div className="bg-gray-50 p-4 rounded-lg">
                                 <h3 className="font-medium text-gray-700 mb-2">Team Information</h3>
                                 <p className="text-gray-600">
-                                    <span className="font-medium">Position:</span> {teamMember.position.name}
+                                    <span className="font-medium">Position:</span> {teamMember.positionId.name}
                                 </p>
                             </div>
                         )}

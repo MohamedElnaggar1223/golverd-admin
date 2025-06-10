@@ -465,8 +465,8 @@ export async function getPublicTeamMemberById(id: string) {
 
         // No authentication required for public profiles
         const teamMember = await SuperUser.findById(id)
-            .populate('position')
-            .select('name email phoneNumber profilePicture position createdAt')
+            .populate('positionId')
+            .select('name email phoneNumber profilePicture positionId createdAt')
             .lean();
 
         return teamMember;
