@@ -2,24 +2,25 @@
 
 import { useState, useEffect } from 'react';
 import FlutterView from "./FlutterView";
-import { generateVendorToken } from "@/lib/actions/firebase-admin-actions";
+import { createAuthShop } from "@/lib/actions/firebase-admin-actions";
 
 interface EmbeddedVirtualStoreProps {
     vendorUid?: string; // Optional: if provided, will impersonate this vendor
 }
 
 export default function EmbeddedVirtualStore({ vendorUid }: EmbeddedVirtualStoreProps) {
-    const [authToken, setAuthToken] = useState<string | null>(null);
+    const [flutterAppUrl, setFlutterAppUrl] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Base URL of your Flutter web app
+    // Base URL of your Flutter web app (fallback if no vendorUid)
     const baseFlutterUrl = 'https://vendor.golverd.com';
 
     useEffect(() => {
-        async function fetchToken() {
+        async function fetchAuthShopUrl() {
             if (!vendorUid) {
                 // No vendor UID provided, load Flutter app normally
+                setFlutterAppUrl(baseFlutterUrl);
                 return;
             }
 
@@ -27,28 +28,26 @@ export default function EmbeddedVirtualStore({ vendorUid }: EmbeddedVirtualStore
             setError(null);
 
             try {
-                const result = await generateVendorToken(vendorUid);
-                if (result.success) {
-                    setAuthToken(result.token);
+                // Call the server action directly
+                const result = await createAuthShop(vendorUid);
+
+                console.log(result);
+
+                if (result.success && result.url) {
+                    setFlutterAppUrl(result.url);
                 } else {
-                    setError('Failed to generate authentication token');
+                    setError('Failed to generate authentication URL');
                 }
             } catch (err) {
-                setError('Failed to generate authentication token');
-                console.error('Error generating token:', err);
+                setError(err instanceof Error ? err.message : 'Failed to generate authentication URL');
+                console.error('Error generating auth shop URL:', err);
             } finally {
                 setLoading(false);
             }
         }
 
-        fetchToken();
+        fetchAuthShopUrl();
     }, [vendorUid]);
-
-    // Construct the Flutter app URL
-    const flutterAppUrl = vendorUid && authToken
-        ? `${baseFlutterUrl}?authToken=${encodeURIComponent(authToken)}&vendorUid=${encodeURIComponent(vendorUid)}`
-        : baseFlutterUrl;
-
 
     if (loading) {
         return (
@@ -56,7 +55,7 @@ export default function EmbeddedVirtualStore({ vendorUid }: EmbeddedVirtualStore
                 <div className="flex items-center justify-center h-full">
                     <div className="text-center">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-                        <p className="mt-2 text-gray-600">Generating authentication token...</p>
+                        <p className="mt-2 text-gray-600">Generating authentication URL...</p>
                     </div>
                 </div>
             </div>
@@ -82,10 +81,22 @@ export default function EmbeddedVirtualStore({ vendorUid }: EmbeddedVirtualStore
         );
     }
 
+    if (!flutterAppUrl) {
+        return (
+            <div style={{ height: '80vh', marginTop: '20px', border: '1px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden' }}>
+                <div className="flex items-center justify-center h-full">
+                    <div className="text-center text-gray-600">
+                        <p>Loading virtual store...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div style={{ height: '80vh', marginTop: '20px', border: '1px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden' }}>
             <FlutterView src={flutterAppUrl} />
-            {vendorUid && authToken && (
+            {vendorUid && (
                 <div className="absolute top-2 right-2 bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
                     Viewing as vendor: {vendorUid}
                 </div>
