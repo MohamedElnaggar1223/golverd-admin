@@ -60,7 +60,21 @@ export async function getAppointmentById(appointmentId: string) {
 export async function getAppointmentsByVendorId(vendorId: string) {
     await connectDB();
 
-    await requirePermission([PERMISSION_KEYS.VIEW_APPOINTMENTS, PERMISSION_KEYS.VIEW_ALL]);
+    const user = await requirePermission([PERMISSION_KEYS.VIEW_APPOINTMENTS, PERMISSION_KEYS.VIEW_ALL]);
+
+    // Priority 1: Business owners get unrestricted access
+    if (!user.isBusinessOwner) {
+        // Priority 2: If user has accountsManaged, restrict to those accounts regardless of other permissions
+        if (user.accountsManaged && user.accountsManaged.length > 0) {
+            if (!user.accountsManaged.includes(vendorId)) {
+                throw new Error("Access denied: You don't have permission to view appointments for this vendor");
+            }
+        }
+        // Priority 3: If user has VIEW_ALL permission and no account restrictions, allow access
+        else if (!user.permissions.viewAll) {
+            throw new Error("Access denied: You don't have permission to view appointments for this vendor");
+        }
+    }
 
     const appointments = await Appointment.find({ vendorId })
         .sort({ date: -1 })

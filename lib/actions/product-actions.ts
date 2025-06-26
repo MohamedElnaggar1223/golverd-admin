@@ -4,6 +4,8 @@ import { connectDB } from '@/lib/mongoose';
 import Product, { IProduct } from '@/models/Product';
 import { uploadImage, deleteImage } from '@/lib/cloudinary';
 import { getSession } from '@/lib/auth';
+import { requirePermission } from '../auth-guards';
+import { PERMISSION_KEYS } from '../permissions';
 
 // Define a specific type for the capital calculation data
 type ProductCapitalData = {
@@ -77,6 +79,31 @@ export async function searchProducts(query: string, limit: number = 10) {
  */
 export async function getProductsByVendorId(vendorId: string) {
     await connectDB();
+
+    // Check if user has permission to view vendor data
+    try {
+        const user = await requirePermission([PERMISSION_KEYS.VIEW_VENDORS, PERMISSION_KEYS.VIEW_ALL]);
+
+        // Priority 1: Business owners get unrestricted access
+        if (!user.isBusinessOwner) {
+            // Priority 2: If user has accountsManaged, restrict to those accounts regardless of other permissions
+            if (user.accountsManaged && user.accountsManaged.length > 0) {
+                if (!user.accountsManaged.includes(vendorId)) {
+                    throw new Error("Access denied: You don't have permission to view products for this vendor");
+                }
+            }
+            // Priority 3: If user has VIEW_ALL permission and no account restrictions, allow access
+            else if (!user.permissions.viewAll) {
+                throw new Error("Access denied: You don't have permission to view products for this vendor");
+            }
+        }
+    } catch (error: any) {
+        // During build/prerender, return empty array instead of throwing
+        if (error.name === 'AuthenticationError') {
+            return [];
+        }
+        throw error;
+    }
 
     const products = await Product.find({
         brandDocID: vendorId

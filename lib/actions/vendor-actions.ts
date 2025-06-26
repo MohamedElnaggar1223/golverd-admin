@@ -10,12 +10,33 @@ export async function getVendors() {
     try {
         await connectDB();
 
-        await requirePermission([PERMISSION_KEYS.VIEW_VENDORS, PERMISSION_KEYS.VIEW_ALL]);
+        const user = await requirePermission([PERMISSION_KEYS.VIEW_VENDORS, PERMISSION_KEYS.VIEW_ALL]);
 
-        // Get all vendors in one query
-        const vendors = await Vendor.find()
-            .sort({ name: 1 })
-            .lean();
+        let vendors;
+
+        // Priority 1: Business owners get unrestricted access
+        if (user.isBusinessOwner) {
+            vendors = await Vendor.find()
+                .sort({ name: 1 })
+                .lean();
+        }
+        // Priority 2: If user has accountsManaged, restrict to those accounts regardless of other permissions
+        else if (user.accountsManaged && user.accountsManaged.length > 0) {
+            vendors = await Vendor.find({ _id: { $in: user.accountsManaged } })
+                .sort({ name: 1 })
+                .lean();
+        }
+        // Priority 3: If user has VIEW_ALL permission and no account restrictions, show all
+        else if (user.permissions.viewAll) {
+            vendors = await Vendor.find()
+                .sort({ name: 1 })
+                .lean();
+        }
+        // Priority 4: User has viewVendors permission but no assigned accounts
+        else {
+            // User has no assigned accounts, return empty array
+            return [];
+        }
 
         return vendors;
     } catch (error: any) {
@@ -32,14 +53,33 @@ export async function getVendorById(vendorId: string) {
     try {
         await connectDB();
 
-        await requirePermission([PERMISSION_KEYS.VIEW_VENDORS, PERMISSION_KEYS.VIEW_ALL]);
+        const user = await requirePermission([PERMISSION_KEYS.VIEW_VENDORS, PERMISSION_KEYS.VIEW_ALL]);
 
         const vendor = await Vendor.findById(vendorId).lean();
         if (!vendor) {
             throw new Error("Vendor not found");
         }
 
-        return vendor;
+        // Priority 1: Business owners get unrestricted access
+        if (user.isBusinessOwner) {
+            return vendor;
+        }
+
+        // Priority 2: If user has accountsManaged, restrict to those accounts regardless of other permissions
+        if (user.accountsManaged && user.accountsManaged.length > 0) {
+            if (!user.accountsManaged.includes(vendorId)) {
+                throw new Error("Access denied: You don't have permission to view this vendor");
+            }
+            return vendor;
+        }
+
+        // Priority 3: If user has VIEW_ALL permission and no account restrictions, allow access
+        if (user.permissions.viewAll) {
+            return vendor;
+        }
+
+        // Priority 4: User has viewVendors permission but no assigned accounts - deny access
+        throw new Error("Access denied: You don't have permission to view this vendor");
     } catch (error: any) {
         // During build/prerender, return null instead of throwing
         if (error.name === 'AuthenticationError') {
@@ -54,7 +94,21 @@ export async function approveVendor(id: string, data: { rent: number, commission
     try {
         await connectDB();
 
-        await requirePermission([PERMISSION_KEYS.EDIT_VENDORS, PERMISSION_KEYS.EDIT_ALL]);
+        const user = await requirePermission([PERMISSION_KEYS.EDIT_VENDORS, PERMISSION_KEYS.EDIT_ALL]);
+
+        // Priority 1: Business owners get unrestricted access
+        if (!user.isBusinessOwner) {
+            // Priority 2: If user has accountsManaged, restrict to those accounts regardless of other permissions
+            if (user.accountsManaged && user.accountsManaged.length > 0) {
+                if (!user.accountsManaged.includes(id)) {
+                    throw new Error("Access denied: You don't have permission to edit this vendor");
+                }
+            }
+            // Priority 3: If user has EDIT_ALL permission and no account restrictions, allow access
+            else if (!user.permissions.editAll) {
+                throw new Error("Access denied: You don't have permission to edit this vendor");
+            }
+        }
 
         const vendor = await Vendor.findByIdAndUpdate(
             id,
@@ -82,7 +136,21 @@ export async function rejectVendor(id: string) {
     try {
         await connectDB();
 
-        await requirePermission([PERMISSION_KEYS.EDIT_VENDORS, PERMISSION_KEYS.EDIT_ALL]);
+        const user = await requirePermission([PERMISSION_KEYS.EDIT_VENDORS, PERMISSION_KEYS.EDIT_ALL]);
+
+        // Priority 1: Business owners get unrestricted access
+        if (!user.isBusinessOwner) {
+            // Priority 2: If user has accountsManaged, restrict to those accounts regardless of other permissions
+            if (user.accountsManaged && user.accountsManaged.length > 0) {
+                if (!user.accountsManaged.includes(id)) {
+                    throw new Error("Access denied: You don't have permission to edit this vendor");
+                }
+            }
+            // Priority 3: If user has EDIT_ALL permission and no account restrictions, allow access
+            else if (!user.permissions.editAll) {
+                throw new Error("Access denied: You don't have permission to edit this vendor");
+            }
+        }
 
         const vendor = await Vendor.findByIdAndUpdate(
             id,
@@ -105,7 +173,21 @@ export async function freezeVendorAccount(id: string) {
     try {
         await connectDB();
 
-        await requirePermission([PERMISSION_KEYS.EDIT_VENDORS, PERMISSION_KEYS.EDIT_ALL]);
+        const user = await requirePermission([PERMISSION_KEYS.EDIT_VENDORS, PERMISSION_KEYS.EDIT_ALL]);
+
+        // Priority 1: Business owners get unrestricted access
+        if (!user.isBusinessOwner) {
+            // Priority 2: If user has accountsManaged, restrict to those accounts regardless of other permissions
+            if (user.accountsManaged && user.accountsManaged.length > 0) {
+                if (!user.accountsManaged.includes(id)) {
+                    throw new Error("Access denied: You don't have permission to edit this vendor");
+                }
+            }
+            // Priority 3: If user has EDIT_ALL permission and no account restrictions, allow access
+            else if (!user.permissions.editAll) {
+                throw new Error("Access denied: You don't have permission to edit this vendor");
+            }
+        }
 
         const vendor = await Vendor.findByIdAndUpdate(
             id,
@@ -140,7 +222,21 @@ export async function deleteVendorAccount(id: string) {
     try {
         await connectDB();
 
-        await requirePermission([PERMISSION_KEYS.EDIT_VENDORS, PERMISSION_KEYS.EDIT_ALL]);
+        const user = await requirePermission([PERMISSION_KEYS.EDIT_VENDORS, PERMISSION_KEYS.EDIT_ALL]);
+
+        // Priority 1: Business owners get unrestricted access
+        if (!user.isBusinessOwner) {
+            // Priority 2: If user has accountsManaged, restrict to those accounts regardless of other permissions
+            if (user.accountsManaged && user.accountsManaged.length > 0) {
+                if (!user.accountsManaged.includes(id)) {
+                    throw new Error("Access denied: You don't have permission to edit this vendor");
+                }
+            }
+            // Priority 3: If user has EDIT_ALL permission and no account restrictions, allow access
+            else if (!user.permissions.editAll) {
+                throw new Error("Access denied: You don't have permission to edit this vendor");
+            }
+        }
 
         const result = await Vendor.findByIdAndDelete(id);
 
@@ -159,7 +255,21 @@ export async function updateVendorRentAndCommission(id: string, data: { rent: nu
     try {
         await connectDB();
 
-        await requirePermission([PERMISSION_KEYS.EDIT_VENDORS, PERMISSION_KEYS.EDIT_ALL]);
+        const user = await requirePermission([PERMISSION_KEYS.EDIT_VENDORS, PERMISSION_KEYS.EDIT_ALL]);
+
+        // Priority 1: Business owners get unrestricted access
+        if (!user.isBusinessOwner) {
+            // Priority 2: If user has accountsManaged, restrict to those accounts regardless of other permissions
+            if (user.accountsManaged && user.accountsManaged.length > 0) {
+                if (!user.accountsManaged.includes(id)) {
+                    throw new Error("Access denied: You don't have permission to edit this vendor");
+                }
+            }
+            // Priority 3: If user has EDIT_ALL permission and no account restrictions, allow access
+            else if (!user.permissions.editAll) {
+                throw new Error("Access denied: You don't have permission to edit this vendor");
+            }
+        }
 
         // Validate the input data
         if (typeof data.rent !== 'number' || data.rent < 0) {

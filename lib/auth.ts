@@ -18,6 +18,7 @@ declare module "next-auth" {
         isBusinessOwner: boolean;
         permissions: UserPermissions;
         positionId?: string;
+        accountsManaged?: string[];
     }
 
     interface Session {
@@ -30,6 +31,7 @@ declare module "next-auth" {
             isBusinessOwner: boolean;
             permissions: UserPermissions;
             positionId?: string;
+            accountsManaged?: string[];
         }
     }
 }
@@ -42,6 +44,7 @@ declare module "next-auth/jwt" {
         isBusinessOwner: boolean;
         permissions: UserPermissions;
         positionId?: string;
+        accountsManaged?: string[];
     }
 }
 
@@ -107,7 +110,8 @@ export const authOptions: NextAuthOptions = {
                     isActive: user.isActive,
                     isBusinessOwner: user.isBusinessOwner,
                     permissions,
-                    positionId: user.positionId
+                    positionId: user.positionId,
+                    accountsManaged: user.accountsManaged || []
                 };
             }
         })
@@ -123,6 +127,7 @@ export const authOptions: NextAuthOptions = {
                 token.isBusinessOwner = user.isBusinessOwner;
                 token.permissions = user.permissions;
                 token.positionId = user.positionId;
+                token.accountsManaged = user.accountsManaged;
             }
             return token;
         },
@@ -136,6 +141,7 @@ export const authOptions: NextAuthOptions = {
                 session.user.isBusinessOwner = token.isBusinessOwner;
                 session.user.permissions = token.permissions;
                 session.user.positionId = token.positionId;
+                session.user.accountsManaged = token.accountsManaged;
             }
             return session;
         }
@@ -220,6 +226,7 @@ export async function getCurrentUser() {
             positionId: currentUser.positionId,
             isBusinessOwner: currentUser.isBusinessOwner,
             isActive: currentUser.isActive,
+            accountsManaged: currentUser.accountsManaged || [],
         };
     } catch (error: any) {
         // During static rendering, return null instead of throwing

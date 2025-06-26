@@ -18,6 +18,7 @@ export interface AuthenticatedUser {
     positionId?: string;
     isBusinessOwner: boolean;
     isActive: boolean;
+    accountsManaged?: string[];
 }
 
 /**
